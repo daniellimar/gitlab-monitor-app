@@ -6,8 +6,8 @@ const { canInstall, install } = usePwaInstall()
 </script>
 
 <template>
-  <button v-if="canInstall" @click="install">
-    Instalar App
+  <button v-if="canInstall" @click="install" class="pwa-install-btn">
+    📲 Instalar App
   </button>
 
   <RouterView />
