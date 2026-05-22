@@ -1,108 +1,375 @@
 # GitLab Monitor
 
-Um painel leve para monitorar métricas do GitLab (pipelines, jobs, runners, commits e mais), construído com Vue 3, Pinia e ECharts.
+[![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![Vue 3](https://img.shields.io/badge/Vue%203-4FC08D?logo=vue.js&logoColor=white)](https://vuejs.org)
+[![Vite](https://img.shields.io/badge/Vite-646CFF?logo=vite&logoColor=white)](https://vitejs.dev)
+[![TypeScript](https://img.shields.io/badge/TypeScript-3178C6?logo=typescript&logoColor=white)](https://www.typescriptlang.org)
 
-Checklist do que este README cobre
-- [x] Descrição rápida do projeto
-- [x] Tecnologias usadas
-- [x] Como instalar e executar em desenvolvimento
-- [x] Configuração (variáveis de ambiente / OAuth / token)
-- [x] Estrutura do projeto e onde procurar funcionalidades
-- [x] Como contribuir e licenciamento
+Painel moderno e responsivo para monitorar métricas do GitLab em tempo real. Visualize pipelines, jobs, runners, commits e estatísticas de atividade com uma interface intuitiva.
 
-Recursos principais
-- Visualização de métricas de pipelines, jobs e atividade de commits
-- Autenticação via Personal Access Token (PAT) ou OAuth2 (PKCE)
-- Suporte a GitLab Self-Managed via `VITE_GITLAB_URL`
+## 📋 Índice
 
-Tecnologias
-- Vue 3
-- Pinia (estado)
-- Vue Router
-- Vite (tooling)
-- ECharts (gráficos)
-- Axios (requisições HTTP)
+- [Recursos](#-recursos)
+- [Tecnologias](#-tecnologias)
+- [Quick Start (sem mise)](#-quick-start-sem-mise)
+- [Configuração com mise (recomendado)](#-configuração-com-mise-recomendado)
+- [Variáveis de Ambiente](#-variáveis-de-ambiente)
+- [Autenticação](#-autenticação)
+- [Estrutura do Projeto](#-estrutura-do-projeto)
+- [Guia de Desenvolvimento](#-guia-de-desenvolvimento)
+- [Troubleshooting](#-troubleshooting)
+- [Contribuindo](#-contribuindo)
+- [Licença](#-licença)
 
-Pré-requisitos
-- Node.js (recomenda-se v18+)
-- pnpm (o repositório inclui `pnpm-lock.yaml`; `pnpm` é recomendado)
+## 🎯 Recursos
 
-Instalação e execução (desenvolvimento)
+- ✅ **Dashboard em tempo real** - Visualize métricas de pipelines, jobs e runners
+- ✅ **Autenticação flexível** - Suporte a Personal Access Token (PAT) e OAuth2 (PKCE)
+- ✅ **GitLab Self-Managed** - Configure para sua instância privada via `VITE_GITLAB_URL`
+- ✅ **Gráficos interativos** - ECharts para visualização de dados
+- ✅ **Interface responsiva** - Funciona em desktop, tablet e mobile
+- ✅ **Temas** - Suporte a tema claro/escuro
 
-1. Instale dependências:
+## 🛠️ Tecnologias
 
-```powershell
+- **Frontend Framework**: Vue 3 + TypeScript
+- **State Management**: Pinia
+- **Routing**: Vue Router
+- **Build Tool**: Vite
+- **Visualização de dados**: ECharts
+- **HTTP Client**: Axios
+- **UI Components**: Shadcn/vue (customizados)
+- **Styling**: Tailwind CSS
+
+## 🚀 Quick Start (sem mise)
+
+### Pré-requisitos
+
+- Node.js v18+ 
+- pnpm v9+ (recomendado; `npm` também funciona)
+
+### Instalação
+
+```bash
+# Clone o repositório
+git clone <seu-repo>
+cd gitlab-monitor
+
+# Instale dependências
 pnpm install
 ```
 
-2. Execute em modo desenvolvimento:
+### Desenvolvimento
 
-```powershell
+```bash
+# Servidor de desenvolvimento (localhost:5173)
 pnpm dev
-```
 
-Build para produção e pré-visualização:
-
-```powershell
+# Build para produção
 pnpm build
+
+# Pré-visualizar build de produção
 pnpm preview
 ```
 
-Observação: Os scripts do projeto também funcionam com `npm`/`yarn` (por exemplo `npm run dev`), mas como o projeto possui `pnpm-lock.yaml` recomendamos `pnpm`.
+---
 
-Configuração / Variáveis de ambiente
+## ⚙️ Configuração com mise (recomendado)
 
-O projeto usa variáveis de ambiente compatíveis com Vite (prefixadas com `VITE_`). As principais variáveis suportadas são:
+O projeto inclui configuração via **[mise](https://mise.jdx.dev/)** para gerenciar Node.js e pnpm automaticamente, evitando conflitos de versão.
 
-- `VITE_GITLAB_URL` - URL base do GitLab (padrão: `https://gitlab.com`). Use para GitLab self-managed.
-- `VITE_GITLAB_TOKEN` - Personal Access Token (PAT). Se definido, o app inicializa já autenticado usando `PRIVATE-TOKEN`.
-- `VITE_GITLAB_CLIENT_ID` - Client ID da aplicação OAuth registrada no GitLab (usado para OAuth PKCE).
-- `VITE_GITLAB_REDIRECT_URI` - Redirect URI configurada na aplicação OAuth (deve apontar para `OAuthCallback` do app).
+### Pré-requisitos
 
-Crie um arquivo `.env` ou `.env.local` na raiz do projeto com o conteúdo (exemplo):
+- [mise instalado](https://mise.jdx.dev/getting-started.html)
 
-```text
+### Passo 1: Criar `.mise.toml`
+
+Crie um arquivo `.mise.toml` na raiz do projeto:
+
+```toml
+[tools]
+node = "22"
+pnpm = "10"
+```
+
+### Passo 2: Ativar as ferramentas
+
+```bash
+# Instala as versões especificadas
+mise install
+
+# Ativa o ambiente (adiciona ao PATH)
+mise use
+```
+
+### Passo 3: Habilitar pnpm (primeira vez)
+
+```bash
+# Ativa o corepack
+mise exec -- corepack enable
+
+# Prepara pnpm v10
+mise exec -- corepack prepare pnpm@10 --activate
+```
+
+### Passo 4: Instalar dependências e executar
+
+```bash
+# Instala dependências do projeto
+mise exec -- pnpm install
+
+# Inicia servidor de desenvolvimento
+mise exec -- pnpm dev
+
+# Ou, se você já ativou com 'mise use', basta:
+pnpm dev
+```
+
+### ⏱️ Alias úteis (opcional)
+
+Adicione ao seu `.bashrc`, `.zshrc` ou similar:
+
+```bash
+alias mdev='mise exec -- pnpm dev'
+alias mbuild='mise exec -- pnpm build'
+alias minstall='mise exec -- pnpm install'
+```
+
+---
+
+## 🔐 Variáveis de Ambiente
+
+O projeto usa variáveis Vite (prefixadas com `VITE_`). Crie um arquivo `.env.local` ou `.env.development.local` na raiz:
+
+### Exemplo `.env.local`
+
+```bash
+# GitLab URL (padrão: https://gitlab.com)
 VITE_GITLAB_URL=https://gitlab.com
+
+# Opção 1: Personal Access Token
 VITE_GITLAB_TOKEN=glpat-xxxxxxxxxxxxxxxx
-# Ou para OAuth
-VITE_GITLAB_CLIENT_ID=your_client_id
+
+# Opção 2: OAuth2 (configure uma OAuth App no GitLab)
+VITE_GITLAB_CLIENT_ID=your-app-client-id
 VITE_GITLAB_REDIRECT_URI=http://localhost:5173/oauth/callback
 ```
 
-Autenticação
+### Para GitLab Self-Managed
 
-- Personal Access Token (PAT): na tela de login do app escolha "Personal Token" e cole o token. Scopes recomendados: `read_api` e `read_user`.
-- OAuth2 (PKCE): registre uma "OAuth Application" no GitLab, configure a `redirect_uri` e defina `VITE_GITLAB_CLIENT_ID` e `VITE_GITLAB_REDIRECT_URI`. O fluxo PKCE é implementado no `src/stores/auth.ts`.
+```bash
+VITE_GITLAB_URL=https://seu-gitlab.com
+VITE_GITLAB_TOKEN=glpat-xxxxxxxxxxxxxxxx
+```
 
-Estrutura importante do projeto
+---
 
-- `src/` - código fonte principal
-  - `src/api/gitlab.ts` - cliente Axios configurado para a API do GitLab
-  - `src/api/endpoints/` - módulos de endpoints (commits, groups, jobs, pipelines, runners)
-  - `src/stores/` - stores Pinia (autenticação e métricas)
-  - `src/views/` - páginas/rotas (Dashboard, Commits, Jobs, Pipelines, Runners, Login, OAuthCallback)
-  - `src/components/` - componentes reutilizáveis e UI
+## 🔑 Autenticação
 
-Onde começar a desenvolver
+### 1️⃣ Personal Access Token (PAT) — Recomendado para desenvolvimento local
 
-- A página de login fica em `src/views/Login.vue`.
-- O fluxo OAuth e persistência de token está em `src/stores/auth.ts`.
-- O cliente HTTP central está em `src/api/gitlab.ts`.
-- Rotas em `src/router/index.ts`.
+1. Vá a **GitLab** → **Settings** → **Access Tokens**
+2. Crie um novo token com escopos: `read_api`, `read_user`, `read_repository`
+3. Copie o token e defina em `.env.local`:
+   ```bash
+   VITE_GITLAB_TOKEN=glpat-xxxxx
+   ```
+4. O app carregará já autenticado na inicialização
 
-Dicas de debug
-- Se não conseguir autenticar com OAuth verifique a `redirect_uri` registrada na aplicação do GitLab e a variável `VITE_GITLAB_REDIRECT_URI`.
-- Para chamadas à API com PAT, verifique se o token possui os scopes adequados e se `VITE_GITLAB_URL` aponta para a instância correta.
+### 2️⃣ OAuth2 (PKCE) — Para ambientes multi-usuário
 
-Contribuindo
+1. Em GitLab, vá a **Admin Panel** → **Applications** (ou **Settings** → **Integrations** → **OAuth2 applications**)
+2. Crie uma nova aplicação com:
+   - **Redirect URI**: `http://localhost:5173/oauth/callback` (ajuste conforme sua URL)
+   - **Scopes**: `read_api`, `read_user`, `read_repository`
+3. Copie o **Client ID**
+4. Configure em `.env.local`:
+   ```bash
+   VITE_GITLAB_CLIENT_ID=your-client-id
+   VITE_GITLAB_REDIRECT_URI=http://localhost:5173/oauth/callback
+   ```
+5. Na tela de login, escolha "Entrar com GitLab"
 
-1. Faça um fork e crie uma branch com a sua feature/bugfix.
-2. Abra um pull request descrevendo suas mudanças.
+---
 
-Licença
+## 📁 Estrutura do Projeto
 
-Projeto licenciado sob a licença contida no arquivo `LICENSE`.
+```
+src/
+├── api/
+│   ├── gitlab.ts              # Cliente Axios + gerenciamento de token
+│   └── endpoints/
+│       ├── commits.ts
+│       ├── groups.ts
+│       ├── jobs.ts
+│       ├── pipelines.ts
+│       └── runners.ts
+├── assets/
+│   └── styles/
+│       └── main.css
+├── components/
+│   ├── layout/
+│   │   ├── Header.vue
+│   │   ├── MainLayout.vue
+│   │   └── Sidebar.vue
+│   ├── metrics/               # Gráficos e cards de dados
+│   │   ├── CommitActivity.vue
+│   │   ├── MetricCard.vue
+│   │   ├── PipelineChart.vue
+│   │   ├── RecentJobs.vue
+│   │   └── RunnersStatus.vue
+│   └── ui/                    # Componentes reutilizáveis
+├── router/
+│   └── index.ts               # Configuração de rotas
+├── stores/
+│   ├── auth.ts                # Autenticação (PAT + OAuth)
+│   └── metrics.ts             # Cache de dados
+├── types/
+│   └── gitlab.ts              # Type definitions
+├── views/                     # Páginas/rotas
+│   ├── Dashboard.vue
+│   ├── Commits.vue
+│   ├── Jobs.vue
+│   ├── Login.vue
+│   ├── OAuthCallback.vue
+│   ├── Pipelines.vue
+│   ├── Runners.vue
+│   └── Settings.vue
+├── App.vue
+└── main.ts
+```
 
-Contato
+---
 
-Se precisar de ajuda ou quiser reportar um bug, abra uma issue neste repositório.
+## 🎓 Guia de Desenvolvimento
+
+### Entendendo o fluxo de autenticação
+
+1. **Inicialização** (`src/main.ts` → `src/stores/auth.ts`):
+   - Se `VITE_GITLAB_TOKEN` está definido, usa PAT (síncrono)
+   - Caso contrário, tenta restaurar OAuth do localStorage
+   
+2. **Login** (`src/views/Login.vue`):
+   - PAT: salva token diretamente no store
+   - OAuth: redireciona para GitLab com PKCE challenge
+
+3. **Callback OAuth** (`src/views/OAuthCallback.vue`):
+   - Valida `state` CSRF
+   - Troca `code` por token com o GitLab
+   - Salva token no localStorage com validade
+
+### Adicionando um novo endpoint
+
+1. Crie um arquivo em `src/api/endpoints/seu-endpoint.ts`:
+
+```typescript
+import gitlabClient from '../gitlab'
+
+export async function fetchMeuDado(projectId: string) {
+  const response = await gitlabClient.instance.get(
+    `/projects/${projectId}/seu-endpoint`
+  )
+  return response.data
+}
+```
+
+2. Use em um componente:
+
+```typescript
+import { fetchMeuDado } from '@/api/endpoints/seu-endpoint'
+
+const dados = ref([])
+onMounted(async () => {
+  dados.value = await fetchMeuDado(projectId.value)
+})
+```
+
+### Debugging na aba Network
+
+- Abra DevTools (F12) → **Network** tab
+- Toda requisição à API do GitLab aparecerá aqui
+- Verifique o header `PRIVATE-TOKEN` ou `Authorization`
+
+---
+
+## 🐛 Troubleshooting
+
+### ❌ "OAuth não configurado"
+
+**Solução**: Configure `VITE_GITLAB_CLIENT_ID` e `VITE_GITLAB_REDIRECT_URI` no `.env.local`
+
+### ❌ "Erro 401 Unauthorized"
+
+**Causas possíveis**:
+- Token expirado ou inválido
+- Scopes insuficientes (adicione `read_api` ao token)
+- URL do GitLab errada em `VITE_GITLAB_URL`
+
+**Solução**: Vá a Settings → Access Tokens, revise e regenere se necessário
+
+### ❌ OAuth redirect inválido
+
+**Problema**: "redirect_uri_mismatch"
+
+**Solução**: Verifique se a `redirect_uri` registrada em **GitLab** → **Applications** bate exatamente com `VITE_GITLAB_REDIRECT_URI` (incluindo protocolo e porta)
+
+Exemplo:
+- Configurada: `http://localhost:5173/oauth/callback`
+- Variável deve ser: `VITE_GITLAB_REDIRECT_URI=http://localhost:5173/oauth/callback`
+
+### ❌ Porta 5173 já em uso
+
+```bash
+# Mudar porta
+pnpm dev -- --port 5174
+
+# Ou ver qual processo usa a porta (Windows)
+netstat -ano | findstr :5173
+```
+
+### ❌ "Cannot find module" ao instalar
+
+**Solução**:
+```bash
+# Limpe cache
+rm -rf node_modules pnpm-lock.yaml
+pnpm install
+```
+
+---
+
+## 📝 Contribuindo
+
+1. **Fork** e crie uma branch: `git checkout -b feature/minha-feature`
+2. **Commit** suas mudanças: `git commit -m 'Adiciona nova feature'`
+3. **Push**: `git push origin feature/minha-feature`
+4. **Abra um Pull Request** com descrição clara
+
+### Padrões do projeto
+
+- **Commits**: Use conventional commits (`feat:`, `fix:`, `docs:`)
+- **Branches**: `feature/`, `bugfix/`, `docs/` como prefixo
+- **Code style**: O projeto usa TypeScript + ESLint (ajuste conforme seu setup)
+
+---
+
+## 📄 Licença
+
+Este projeto está licenciado sob a [MIT License](LICENSE).
+
+---
+
+## 💬 Contato & Suporte
+
+- 📌 **Issues**: Abra uma [issue](../../issues) para bugs e sugestões
+- 💡 **Discussões**: Dúvidas? Abra uma [discussion](../../discussions)
+
+---
+
+## 📚 Recursos úteis
+
+- [GitLab API Docs](https://docs.gitlab.com/ee/api/)
+- [Vue 3 Guide](https://vuejs.org/guide/)
+- [Pinia Docs](https://pinia.vuejs.org/)
+- [Vite Docs](https://vitejs.dev/guide/)
+- [mise Docs](https://mise.jdx.dev/)
