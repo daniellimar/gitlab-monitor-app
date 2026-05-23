@@ -45,6 +45,11 @@ export async function getRunner(runnerId: number): Promise<GitLabRunner> {
   return response.data
 }
 
+export async function getRunnerFull(runnerId: number): Promise<Record<string, unknown>> {
+  const response = await gitlabClient.instance.get(`/runners/${runnerId}`)
+  return response.data as Record<string, unknown>
+}
+
 export async function getGroupRunners(
   groupId: string | number,
   options: {

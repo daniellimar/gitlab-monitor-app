@@ -3,8 +3,17 @@ import { parseTotalHeader } from '../utils'
 import type { GitLabGroup, GitLabProject } from '@/types/gitlab'
 
 export async function getGroup(groupId: string | number): Promise<GitLabGroup> {
-  const response = await gitlabClient.instance.get<GitLabGroup>(`/groups/${groupId}`)
+  const response = await gitlabClient.instance.get<GitLabGroup>(`/groups/${groupId}`, {
+    params: { with_projects: false, with_custom_attributes: true },
+  })
   return response.data
+}
+
+export async function getGroupFull(groupId: string | number): Promise<Record<string, unknown>> {
+  const response = await gitlabClient.instance.get(`/groups/${groupId}`, {
+    params: { with_projects: false, with_custom_attributes: true },
+  })
+  return response.data as Record<string, unknown>
 }
 
 export async function getGroupProjects(
@@ -45,6 +54,8 @@ export async function getProject(projectId: string | number): Promise<GitLabProj
   const response = await gitlabClient.instance.get<GitLabProject>(`/projects/${projectId}`, {
     params: {
       statistics: true,
+      with_custom_attributes: true,
+      license: true,
     },
   })
   return response.data

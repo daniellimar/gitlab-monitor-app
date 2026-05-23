@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
+import { useRouter, RouterView } from 'vue-router'
 import { formatDistanceToNow, parseISO } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 import {
@@ -17,8 +18,14 @@ import Badge from '@/components/ui/Badge.vue'
 import Select from '@/components/ui/Select.vue'
 import Input from '@/components/ui/Input.vue'
 import { useMetricsStore } from '@/stores/metrics'
+import DetailDrawer from '@/components/detail/DetailDrawer.vue'
 
+const router = useRouter()
 const metricsStore = useMetricsStore()
+
+function openProject(id: number) {
+  router.push({ name: 'ProjectDetail', params: { projectId: String(id) } })
+}
 
 const searchQuery = ref('')
 const sortBy = ref('last_activity_at')
@@ -126,7 +133,11 @@ function formatBytes(bytes: number) {
         <Card
           v-for="project in filteredProjects"
           :key="project.id"
-          class="p-4 transition-colors hover:bg-muted/20"
+          class="cursor-pointer p-4 transition-colors hover:bg-muted/40"
+          role="button"
+          tabindex="0"
+          @click="openProject(project.id)"
+          @keydown.enter="openProject(project.id)"
         >
           <div class="flex items-start justify-between gap-3">
             <div class="flex min-w-0 flex-1 items-start gap-3">
@@ -153,6 +164,7 @@ function formatBytes(bytes: number) {
               target="_blank"
               rel="noopener noreferrer"
               class="text-muted-foreground hover:text-foreground"
+              @click.stop
             >
               <ExternalLink class="h-4 w-4" />
             </a>
@@ -206,5 +218,11 @@ function formatBytes(bytes: number) {
         </div>
       </Card>
     </div>
+
+    <RouterView v-slot="{ Component }">
+      <DetailDrawer v-if="Component" @close="router.back()">
+        <component :is="Component" />
+      </DetailDrawer>
+    </RouterView>
   </MainLayout>
 </template>

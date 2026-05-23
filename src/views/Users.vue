@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
+import { useRouter, RouterView } from 'vue-router'
 import { format, parseISO } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 import { Users, ExternalLink, Filter, Search, Shield } from 'lucide-vue-next'
@@ -10,8 +11,14 @@ import Select from '@/components/ui/Select.vue'
 import Input from '@/components/ui/Input.vue'
 import { useMetricsStore } from '@/stores/metrics'
 import { ACCESS_LEVEL_OPTIONS, getAccessLevelLabel } from '@/utils/gitlabAccess'
+import DetailDrawer from '@/components/detail/DetailDrawer.vue'
 
+const router = useRouter()
 const metricsStore = useMetricsStore()
+
+function openUser(id: number) {
+  router.push({ name: 'UserDetail', params: { userId: String(id) } })
+}
 
 const searchQuery = ref('')
 const roleFilter = ref('all')
@@ -134,7 +141,11 @@ function formatJoined(date: string) {
           <div
             v-for="member in filteredMembers"
             :key="member.id"
-            class="flex items-center gap-4 p-4 hover:bg-muted/30"
+            class="flex cursor-pointer items-center gap-4 p-4 hover:bg-muted/40"
+            role="button"
+            tabindex="0"
+            @click="openUser(member.id)"
+            @keydown.enter="openUser(member.id)"
           >
             <img
               v-if="member.avatar_url"
@@ -170,6 +181,7 @@ function formatJoined(date: string) {
               target="_blank"
               rel="noopener noreferrer"
               class="text-muted-foreground hover:text-foreground"
+              @click.stop
             >
               <ExternalLink class="h-4 w-4" />
             </a>
@@ -187,5 +199,11 @@ function formatJoined(date: string) {
         </div>
       </Card>
     </div>
+
+    <RouterView v-slot="{ Component }">
+      <DetailDrawer v-if="Component" @close="router.back()">
+        <component :is="Component" />
+      </DetailDrawer>
+    </RouterView>
   </MainLayout>
 </template>

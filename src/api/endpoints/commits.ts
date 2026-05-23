@@ -46,6 +46,29 @@ export async function getCommit(projectId: string | number, sha: string): Promis
   return response.data
 }
 
+export async function getCommitFull(
+  projectId: string | number,
+  sha: string
+): Promise<Record<string, unknown>> {
+  const response = await gitlabClient.instance.get(
+    `/projects/${projectId}/repository/commits/${sha}`,
+    { params: { stats: true } }
+  )
+  return response.data as Record<string, unknown>
+}
+
+/** Diff stats por arquivo (quando disponível). */
+export async function getCommitDiff(
+  projectId: string | number,
+  sha: string
+): Promise<Record<string, unknown>[]> {
+  const response = await gitlabClient.instance.get(
+    `/projects/${projectId}/repository/commits/${sha}/diff`,
+    { params: { unidiff: true } }
+  )
+  return response.data as Record<string, unknown>[]
+}
+
 export async function getAllGroupCommits(
   projects: { id: number }[],
   options: {

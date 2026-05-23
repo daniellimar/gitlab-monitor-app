@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
+import { useRouter, RouterView } from 'vue-router'
 import { parseISO, format } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 import {
@@ -16,8 +17,18 @@ import Badge from '@/components/ui/Badge.vue'
 import Select from '@/components/ui/Select.vue'
 import { useMetricsStore } from '@/stores/metrics'
 import { COMMIT_PERIOD_OPTIONS, parseCommitPeriodDays } from '@/constants/periods'
+import DetailDrawer from '@/components/detail/DetailDrawer.vue'
 
+const router = useRouter()
 const metricsStore = useMetricsStore()
+
+function openCommit(commit: { project_id?: number; id: string }) {
+  if (!commit.project_id) return
+  router.push({
+    name: 'CommitDetail',
+    params: { projectId: String(commit.project_id), sha: commit.id },
+  })
+}
 
 const authorFilter = ref('all')
 const projectFilter = ref('all')
@@ -158,7 +169,11 @@ function truncateMessage(message: string, maxLength = 80) {
           <div
             v-for="commit in filteredCommits"
             :key="commit.id"
-            class="flex items-start gap-4 p-4 hover:bg-muted/30"
+            class="flex cursor-pointer items-start gap-4 p-4 hover:bg-muted/40"
+            role="button"
+            tabindex="0"
+            @click="openCommit(commit)"
+            @keydown.enter="openCommit(commit)"
           >
             <div
               class="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-muted"
@@ -190,6 +205,7 @@ function truncateMessage(message: string, maxLength = 80) {
                   target="_blank"
                   rel="noopener noreferrer"
                   class="flex-shrink-0 text-muted-foreground hover:text-foreground"
+                  @click.stop
                 >
                   <ExternalLink class="h-4 w-4" />
                 </a>
@@ -217,5 +233,11 @@ function truncateMessage(message: string, maxLength = 80) {
         </div>
       </Card>
     </div>
+
+    <RouterView v-slot="{ Component }">
+      <DetailDrawer v-if="Component" @close="router.back()">
+        <component :is="Component" />
+      </DetailDrawer>
+    </RouterView>
   </MainLayout>
 </template>

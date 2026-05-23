@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
+import { useRouter, RouterView } from 'vue-router'
 import { formatDistanceToNow, parseISO } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 import { Server, Filter, Tag } from 'lucide-vue-next'
@@ -15,8 +16,14 @@ import Card from '@/components/ui/Card.vue'
 import Badge from '@/components/ui/Badge.vue'
 import Select from '@/components/ui/Select.vue'
 import { useMetricsStore } from '@/stores/metrics'
+import DetailDrawer from '@/components/detail/DetailDrawer.vue'
 
+const router = useRouter()
 const metricsStore = useMetricsStore()
+
+function openRunner(id: number) {
+  router.push({ name: 'RunnerDetail', params: { runnerId: String(id) } })
+}
 
 const statusFilter = ref<string>('all')
 const typeFilter = ref<string>('all')
@@ -126,7 +133,11 @@ function formatTime(date: string | null) {
         <Card
           v-for="runner in filteredRunners"
           :key="runner.id"
-          class="p-4"
+          class="cursor-pointer p-4 transition-colors hover:bg-muted/40"
+          role="button"
+          tabindex="0"
+          @click="openRunner(runner.id)"
+          @keydown.enter="openRunner(runner.id)"
         >
           <div class="flex items-start justify-between">
             <div class="flex items-center gap-3">
@@ -213,5 +224,11 @@ function formatTime(date: string | null) {
         </div>
       </div>
     </div>
+
+    <RouterView v-slot="{ Component }">
+      <DetailDrawer v-if="Component" @close="router.back()">
+        <component :is="Component" />
+      </DetailDrawer>
+    </RouterView>
   </MainLayout>
 </template>

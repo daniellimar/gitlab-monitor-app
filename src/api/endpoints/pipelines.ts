@@ -60,6 +60,16 @@ export async function getPipeline(
   return response.data
 }
 
+export async function getPipelineFull(
+  projectId: string | number,
+  pipelineId: number
+): Promise<Record<string, unknown>> {
+  const response = await gitlabClient.instance.get(
+    `/projects/${projectId}/pipelines/${pipelineId}`
+  )
+  return response.data as Record<string, unknown>
+}
+
 export async function getAllGroupPipelines(
   projects: { id: number }[],
   options: {

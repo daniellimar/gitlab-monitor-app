@@ -59,6 +59,14 @@ export async function getJob(projectId: string | number, jobId: number): Promise
   return response.data
 }
 
+export async function getJobFull(
+  projectId: string | number,
+  jobId: number
+): Promise<Record<string, unknown>> {
+  const response = await gitlabClient.instance.get(`/projects/${projectId}/jobs/${jobId}`)
+  return response.data as Record<string, unknown>
+}
+
 export async function getAllGroupJobs(
   projects: { id: number }[],
   options: {

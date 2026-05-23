@@ -26,6 +26,16 @@ export async function getGroupMembers(
   return { data: response.data, total: parseTotalHeader(response.headers) }
 }
 
+export async function getGroupMember(
+  groupId: string | number,
+  userId: string | number
+): Promise<Record<string, unknown>> {
+  const response = await gitlabClient.instance.get(
+    `/groups/${groupId}/members/${userId}`
+  )
+  return response.data as Record<string, unknown>
+}
+
 export async function getAllGroupMembers(
   groupId: string | number
 ): Promise<GitLabGroupMember[]> {

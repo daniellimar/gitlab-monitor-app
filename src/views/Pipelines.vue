@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
+import { useRouter, RouterView } from 'vue-router'
 import { formatDistanceToNow, parseISO } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 import { GitBranch, ExternalLink, Filter } from 'lucide-vue-next'
@@ -9,8 +10,17 @@ import Card from '@/components/ui/Card.vue'
 import Badge from '@/components/ui/Badge.vue'
 import Select from '@/components/ui/Select.vue'
 import { useMetricsStore } from '@/stores/metrics'
+import DetailDrawer from '@/components/detail/DetailDrawer.vue'
 
+const router = useRouter()
 const metricsStore = useMetricsStore()
+
+function openPipeline(pipeline: { project_id: number; id: number }) {
+  router.push({
+    name: 'PipelineDetail',
+    params: { projectId: String(pipeline.project_id), pipelineId: String(pipeline.id) },
+  })
+}
 
 const statusFilter = ref<string>('all')
 const projectFilter = ref<string>('all')
@@ -132,7 +142,8 @@ function getProjectName(projectId: number) {
               <tr
                 v-for="pipeline in filteredPipelines"
                 :key="pipeline.id"
-                class="border-b border-border last:border-0 hover:bg-muted/30"
+                class="cursor-pointer border-b border-border last:border-0 hover:bg-muted/40"
+                @click="openPipeline(pipeline)"
               >
                 <td class="px-4 py-3">
                   <div class="flex items-center gap-2">
@@ -175,6 +186,7 @@ function getProjectName(projectId: number) {
                     target="_blank"
                     rel="noopener noreferrer"
                     class="text-muted-foreground hover:text-foreground"
+                    @click.stop
                   >
                     <ExternalLink class="h-4 w-4" />
                   </a>
@@ -192,5 +204,11 @@ function getProjectName(projectId: number) {
         </div>
       </Card>
     </div>
+
+    <RouterView v-slot="{ Component }">
+      <DetailDrawer v-if="Component" @close="router.back()">
+        <component :is="Component" />
+      </DetailDrawer>
+    </RouterView>
   </MainLayout>
 </template>

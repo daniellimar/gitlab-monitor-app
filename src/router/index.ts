@@ -25,36 +25,83 @@ const routes = [
     name: 'Pipelines',
     component: () => import('@/views/Pipelines.vue'),
     meta: { requiresAuth: true },
+    children: [
+      {
+        path: ':projectId/:pipelineId',
+        name: 'PipelineDetail',
+        component: () => import('@/components/detail/PipelineDetailPanel.vue'),
+      },
+    ],
   },
   {
     path: '/jobs',
     name: 'Jobs',
     component: () => import('@/views/Jobs.vue'),
     meta: { requiresAuth: true },
+    children: [
+      {
+        path: ':projectId/:jobId',
+        name: 'JobDetail',
+        component: () => import('@/components/detail/JobDetailPanel.vue'),
+      },
+    ],
   },
   {
     path: '/runners',
     name: 'Runners',
     component: () => import('@/views/Runners.vue'),
     meta: { requiresAuth: true },
+    children: [
+      {
+        path: ':runnerId',
+        name: 'RunnerDetail',
+        component: () => import('@/components/detail/RunnerDetailPanel.vue'),
+      },
+    ],
   },
   {
     path: '/projects',
     name: 'Projects',
     component: () => import('@/views/Projects.vue'),
     meta: { requiresAuth: true },
+    children: [
+      {
+        path: ':projectId',
+        name: 'ProjectDetail',
+        component: () => import('@/components/detail/ProjectDetailPanel.vue'),
+      },
+      {
+        path: ':projectId/commits/:sha',
+        name: 'ProjectCommitDetail',
+        component: () => import('@/components/detail/CommitDetailPanel.vue'),
+      },
+    ],
   },
   {
     path: '/commits',
     name: 'Commits',
     component: () => import('@/views/Commits.vue'),
     meta: { requiresAuth: true },
+    children: [
+      {
+        path: ':projectId/:sha',
+        name: 'CommitDetail',
+        component: () => import('@/components/detail/CommitDetailPanel.vue'),
+      },
+    ],
   },
   {
     path: '/users',
     name: 'Users',
     component: () => import('@/views/Users.vue'),
     meta: { requiresAuth: true },
+    children: [
+      {
+        path: ':userId',
+        name: 'UserDetail',
+        component: () => import('@/components/detail/UserDetailPanel.vue'),
+      },
+    ],
   },
   {
     path: '/settings',
@@ -73,11 +120,9 @@ const router = createRouter({
   routes,
 })
 
-// Navigation guard
 router.beforeEach((to, _from, next) => {
   const authStore = useAuthStore()
-  
-  // Initialize auth from env/storage on first navigation
+
   if (!authStore.isAuthenticated) {
     authStore.initFromEnv()
   }

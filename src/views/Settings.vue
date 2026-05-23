@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import {
   Key,
@@ -17,6 +17,9 @@ import Select from '@/components/ui/Select.vue'
 import { useAuthStore } from '@/stores/auth'
 import { useMetricsStore } from '@/stores/metrics'
 import { getGitlabWebUrl } from '@/config/gitlab'
+import { getGroupFull } from '@/api/endpoints/groups'
+import ApiDataExplorer from '@/components/detail/ApiDataExplorer.vue'
+import { mergeApiRecords } from '@/utils/apiDataDisplay'
 
 const router = useRouter()
 const authStore = useAuthStore()
@@ -35,6 +38,27 @@ const refreshOptions = [
 ]
 
 const isSaving = ref(false)
+const groupApiData = ref<Record<string, unknown>>({})
+
+const sessionApiData = computed(() =>
+  mergeApiRecords(
+    groupApiData.value,
+    authStore.user ? { current_user: authStore.user as unknown as Record<string, unknown> } : undefined,
+    metricsStore.group ? { group_summary: metricsStore.group as unknown as Record<string, unknown> } : undefined
+  )
+)
+
+onMounted(async () => {
+  if (metricsStore.groupId) {
+    try {
+      groupApiData.value = await getGroupFull(metricsStore.groupId)
+    } catch {
+      if (metricsStore.group) {
+        groupApiData.value = metricsStore.group as unknown as Record<string, unknown>
+      }
+    }
+  }
+})
 
 async function saveSettings() {
   isSaving.value = true
@@ -180,6 +204,12 @@ const authMethodLabel = computed(() => {
           />
         </div>
       </Card>
+
+      <ApiDataExplorer
+        v-if="Object.keys(sessionApiData).length"
+        :data="sessionApiData"
+        title="Dados da API (grupo e sessão)"
+      />
 
       <!-- Save Button -->
       <div class="flex justify-end">
