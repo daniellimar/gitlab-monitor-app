@@ -1,5 +1,8 @@
 import gitlabClient from '../gitlab'
+import { fetchAcrossProjects, parseTotalHeader } from '../utils'
 import type { GitLabJob, JobStatus } from '@/types/gitlab'
+
+export { calculateJobStats } from '@/utils/stats'
 
 export async function getProjectJobs(
   projectId: string | number,
@@ -19,8 +22,7 @@ export async function getProjectJobs(
     },
   })
 
-  const total = parseInt(response.headers['x-total'] || '0', 10)
-  return { data: response.data, total }
+  return { data: response.data, total: parseTotalHeader(response.headers) }
 }
 
 export async function getPipelineJobs(
@@ -47,14 +49,10 @@ export async function getPipelineJobs(
     }
   )
 
-  const total = parseInt(response.headers['x-total'] || '0', 10)
-  return { data: response.data, total }
+  return { data: response.data, total: parseTotalHeader(response.headers) }
 }
 
-export async function getJob(
-  projectId: string | number,
-  jobId: number
-): Promise<GitLabJob> {
+export async function getJob(projectId: string | number, jobId: number): Promise<GitLabJob> {
   const response = await gitlabClient.instance.get<GitLabJob>(
     `/projects/${projectId}/jobs/${jobId}`
   )
@@ -70,46 +68,7 @@ export async function getAllGroupJobs(
 ): Promise<GitLabJob[]> {
   const { perPage = 50, scope } = options
 
-  const jobsPromises = projects.slice(0, 20).map((project) =>
-    getProjectJobs(project.id, { perPage, scope }).catch(() => ({ data: [], total: 0 }))
+  return fetchAcrossProjects(projects, (projectId) =>
+    getProjectJobs(projectId, { perPage, scope })
   )
-
-  const results = await Promise.all(jobsPromises)
-  return results.flatMap((r) => r.data)
-}
-
-export function calculateJobStats(jobs: GitLabJob[]) {
-  const total = jobs.length
-  const success = jobs.filter((j) => j.status === 'success').length
-  const failed = jobs.filter((j) => j.status === 'failed').length
-  const running = jobs.filter((j) => j.status === 'running').length
-  const pending = jobs.filter((j) => j.status === 'pending').length
-
-  const byStage = jobs.reduce(
-    (acc, job) => {
-      if (!acc[job.stage]) {
-        acc[job.stage] = { count: 0, totalDuration: 0 }
-      }
-      acc[job.stage].count++
-      acc[job.stage].totalDuration += job.duration || 0
-      return acc
-    },
-    {} as Record<string, { count: number; totalDuration: number }>
-  )
-
-  const stages = Object.entries(byStage).map(([stage, data]) => ({
-    stage,
-    count: data.count,
-    avgDuration: Math.round(data.totalDuration / data.count),
-  }))
-
-  return {
-    total,
-    success,
-    failed,
-    running,
-    pending,
-    stages,
-    successRate: total > 0 ? Math.round((success / total) * 100) : 0,
-  }
 }

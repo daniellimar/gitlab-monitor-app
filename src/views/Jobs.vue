@@ -2,22 +2,13 @@
 import { computed, ref } from 'vue'
 import { formatDistanceToNow, parseISO } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
-import {
-  CheckCircle2,
-  XCircle,
-  Clock,
-  Play,
-  GitBranch,
-  ExternalLink,
-  Filter,
-  Server,
-} from 'lucide-vue-next'
+import { GitBranch, ExternalLink, Filter, Server } from 'lucide-vue-next'
+import { getCiStatusIcon, getCiStatusVariant } from '@/utils/gitlabStatus'
 import MainLayout from '@/components/layout/MainLayout.vue'
 import Card from '@/components/ui/Card.vue'
 import Badge from '@/components/ui/Badge.vue'
 import Select from '@/components/ui/Select.vue'
 import { useMetricsStore } from '@/stores/metrics'
-import type { JobStatus } from '@/types/gitlab'
 
 const metricsStore = useMetricsStore()
 
@@ -56,35 +47,6 @@ const filteredJobs = computed(() => {
 })
 
 const stats = computed(() => metricsStore.jobStats)
-
-function getStatusIcon(status: JobStatus) {
-  switch (status) {
-    case 'success':
-      return CheckCircle2
-    case 'failed':
-      return XCircle
-    case 'running':
-      return Play
-    default:
-      return Clock
-  }
-}
-
-function getStatusVariant(status: JobStatus): 'success' | 'destructive' | 'warning' | 'muted' | 'default' {
-  switch (status) {
-    case 'success':
-      return 'success'
-    case 'failed':
-      return 'destructive'
-    case 'running':
-      return 'default'
-    case 'pending':
-    case 'manual':
-      return 'warning'
-    default:
-      return 'muted'
-  }
-}
 
 function formatDuration(seconds: number | null) {
   if (!seconds) return '-'
@@ -191,7 +153,7 @@ function formatTime(date: string | null) {
                 <td class="px-4 py-3">
                   <div class="flex items-center gap-2">
                     <component
-                      :is="getStatusIcon(job.status)"
+                      :is="getCiStatusIcon(job.status)"
                       :class="[
                         'h-5 w-5',
                         job.status === 'success' ? 'text-success' :
@@ -200,7 +162,7 @@ function formatTime(date: string | null) {
                         'text-muted-foreground',
                       ]"
                     />
-                    <Badge :variant="getStatusVariant(job.status)">
+                    <Badge :variant="getCiStatusVariant(job.status)">
                       {{ job.status }}
                     </Badge>
                   </div>

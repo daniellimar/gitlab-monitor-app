@@ -16,12 +16,13 @@ import Input from '@/components/ui/Input.vue'
 import Select from '@/components/ui/Select.vue'
 import { useAuthStore } from '@/stores/auth'
 import { useMetricsStore } from '@/stores/metrics'
+import { getGitlabWebUrl } from '@/config/gitlab'
 
 const router = useRouter()
 const authStore = useAuthStore()
 const metricsStore = useMetricsStore()
 
-const gitlabUrl = ref(import.meta.env.VITE_GITLAB_URL || 'https://gitlab.com')
+const gitlabUrl = ref(getGitlabWebUrl())
 const groupId = ref(metricsStore.groupId)
 const refreshInterval = ref(String(metricsStore.refreshInterval / 1000))
 

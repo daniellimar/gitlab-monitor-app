@@ -1,5 +1,8 @@
 import gitlabClient from '../gitlab'
+import { fetchAcrossProjects, parseTotalHeader } from '../utils'
 import type { GitLabPipeline, PipelineStatus } from '@/types/gitlab'
+
+export { calculatePipelineStats } from '@/utils/stats'
 
 export async function getProjectPipelines(
   projectId: string | number,
@@ -44,8 +47,7 @@ export async function getProjectPipelines(
     }
   )
 
-  const total = parseInt(response.headers['x-total'] || '0', 10)
-  return { data: response.data, total }
+  return { data: response.data, total: parseTotalHeader(response.headers) }
 }
 
 export async function getPipeline(
@@ -67,17 +69,10 @@ export async function getAllGroupPipelines(
   } = {}
 ): Promise<GitLabPipeline[]> {
   const { perPage = 100, status, updatedAfter } = options
-  
-  const pipelinesPromises = projects.slice(0, 20).map((project) =>
-    getProjectPipelines(project.id, {
-      perPage,
-      status,
-      updatedAfter,
-    }).catch(() => ({ data: [], total: 0 }))
-  )
 
-  const results = await Promise.all(pipelinesPromises)
-  return results.flatMap((r) => r.data)
+  return fetchAcrossProjects(projects, (projectId) =>
+    getProjectPipelines(projectId, { perPage, status, updatedAfter })
+  )
 }
 
 export async function getPipelinesByStatus(
@@ -85,30 +80,4 @@ export async function getPipelinesByStatus(
   status: PipelineStatus
 ): Promise<GitLabPipeline[]> {
   return getAllGroupPipelines(projects, { status, perPage: 50 })
-}
-
-export function calculatePipelineStats(pipelines: GitLabPipeline[]) {
-  const total = pipelines.length
-  const success = pipelines.filter((p) => p.status === 'success').length
-  const failed = pipelines.filter((p) => p.status === 'failed').length
-  const running = pipelines.filter((p) => p.status === 'running').length
-  const pending = pipelines.filter((p) => p.status === 'pending').length
-  const canceled = pipelines.filter((p) => p.status === 'canceled').length
-
-  const successRate = total > 0 ? Math.round((success / total) * 100) : 0
-  
-  const avgDuration = pipelines
-    .filter((p) => p.duration)
-    .reduce((acc, p) => acc + (p.duration || 0), 0) / (pipelines.filter((p) => p.duration).length || 1)
-
-  return {
-    total,
-    success,
-    failed,
-    running,
-    pending,
-    canceled,
-    successRate,
-    avgDuration: Math.round(avgDuration),
-  }
 }

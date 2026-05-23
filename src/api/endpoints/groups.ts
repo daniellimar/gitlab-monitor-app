@@ -1,4 +1,5 @@
 import gitlabClient from '../gitlab'
+import { parseTotalHeader } from '../utils'
 import type { GitLabGroup, GitLabProject } from '@/types/gitlab'
 
 export async function getGroup(groupId: string | number): Promise<GitLabGroup> {
@@ -37,8 +38,7 @@ export async function getGroupProjects(
     },
   })
 
-  const total = parseInt(response.headers['x-total'] || '0', 10)
-  return { data: response.data, total }
+  return { data: response.data, total: parseTotalHeader(response.headers) }
 }
 
 export async function getProject(projectId: string | number): Promise<GitLabProject> {

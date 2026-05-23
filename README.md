@@ -144,8 +144,11 @@ O projeto usa variáveis Vite (prefixadas com `VITE_`). Crie um arquivo `.env.lo
 ### Exemplo `.env.local`
 
 ```bash
-# GitLab URL (padrão: https://gitlab.com)
+# GitLab URL — use sempre https:// (http://gitlab.com causa erro de CORS no browser)
 VITE_GITLAB_URL=https://gitlab.com
+
+# Proxy no Vite (dev e preview) — evita bloqueio CORS nas chamadas à API
+VITE_USE_API_PROXY=true
 
 # Opção 1: Personal Access Token
 VITE_GITLAB_TOKEN=glpat-xxxxxxxxxxxxxxxx
@@ -197,44 +200,31 @@ VITE_GITLAB_TOKEN=glpat-xxxxxxxxxxxxxxxx
 ```
 src/
 ├── api/
-│   ├── gitlab.ts              # Cliente Axios + gerenciamento de token
+│   ├── gitlab.ts              # Cliente Axios + autenticação (PAT/OAuth)
+│   ├── utils.ts               # Helpers (paginação, fetch em lote)
 │   └── endpoints/
 │       ├── commits.ts
 │       ├── groups.ts
 │       ├── jobs.ts
 │       ├── pipelines.ts
 │       └── runners.ts
-├── assets/
-│   └── styles/
-│       └── main.css
+├── composables/
+│   └── useMetricsRefresh.ts   # Carregamento e auto-refresh de métricas
+├── utils/
+│   ├── gitlabStatus.ts        # Ícones/variantes de status CI
+│   ├── runnerStatus.ts        # Status de runners
+│   └── stats/                 # Cálculo de métricas agregadas
+├── assets/styles/main.css
 ├── components/
 │   ├── layout/
-│   │   ├── Header.vue
-│   │   ├── MainLayout.vue
-│   │   └── Sidebar.vue
-│   ├── metrics/               # Gráficos e cards de dados
-│   │   ├── CommitActivity.vue
-│   │   ├── MetricCard.vue
-│   │   ├── PipelineChart.vue
-│   │   ├── RecentJobs.vue
-│   │   └── RunnersStatus.vue
-│   └── ui/                    # Componentes reutilizáveis
+│   ├── metrics/
+│   └── ui/
 ├── router/
-│   └── index.ts               # Configuração de rotas
 ├── stores/
-│   ├── auth.ts                # Autenticação (PAT + OAuth)
-│   └── metrics.ts             # Cache de dados
 ├── types/
-│   └── gitlab.ts              # Type definitions
-├── views/                     # Páginas/rotas
-│   ├── Dashboard.vue
-│   ├── Commits.vue
-│   ├── Jobs.vue
-│   ├── Login.vue
-│   ├── OAuthCallback.vue
-│   ├── Pipelines.vue
-│   ├── Runners.vue
-│   └── Settings.vue
+├── views/
+│   ├── Projects.vue
+│   ├── Users.vue
 ├── App.vue
 └── main.ts
 ```
@@ -293,6 +283,30 @@ onMounted(async () => {
 ---
 
 ## 🐛 Troubleshooting
+
+### ❌ `injectScript.js` / "Cannot assign to read only property 'open'"
+
+**Não é do GitLab Monitor.** Esse arquivo vem de **extensão do navegador** (bloqueador de anúncios, antivírus, tradutor, etc.) que injeta código na página.
+
+**Como confirmar**: abra o app em janela anônima sem extensões, ou desative extensões uma a uma. O erro deve sumir.
+
+### ❌ Aviso PWA "Banner not shown... preventDefault()"
+
+O app não intercepta mais o prompt de instalação. Para instalar como PWA, use o menu do navegador (ícone de instalar na barra de endereço ou "Instalar aplicativo").
+
+### ❌ CORS / "Redirect is not allowed for a preflight request"
+
+**Causa**: O browser chama a API do GitLab diretamente (`localhost` → `gitlab.com`). Isso falha porque:
+1. `http://gitlab.com` redireciona para HTTPS e o preflight OPTIONS não pode seguir redirect.
+2. O GitLab não expõe CORS para origens locais com headers como `PRIVATE-TOKEN`.
+
+**Solução**:
+1. No `.env`, use `VITE_GITLAB_URL=https://gitlab.com` (com **https**).
+2. Ative o proxy: `VITE_USE_API_PROXY=true`
+3. Use `npm run dev` ou `npm run preview` (o proxy está no Vite, não no build estático servido por outro servidor).
+4. Após alterar `.env`, reinicie o servidor ou rode `npm run build` de novo antes do `preview`.
+
+Em produção (sem Vite), configure um reverse proxy (nginx/Caddy) de `/api/gitlab` para o seu GitLab.
 
 ### ❌ "OAuth não configurado"
 

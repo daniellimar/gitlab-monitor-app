@@ -2,14 +2,14 @@
 import { computed, ref } from 'vue'
 import { formatDistanceToNow, parseISO } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
+import { Server, Filter, Tag } from 'lucide-vue-next'
 import {
-  Server,
-  Wifi,
-  WifiOff,
-  Pause,
-  Filter,
-  Tag,
-} from 'lucide-vue-next'
+  getRunnerStatusIcon,
+  getRunnerStatusVariant,
+  getRunnerStatusLabel,
+  getRunnerTypeLabel,
+  getRunnerTags,
+} from '@/utils/runnerStatus'
 import MainLayout from '@/components/layout/MainLayout.vue'
 import Card from '@/components/ui/Card.vue'
 import Badge from '@/components/ui/Badge.vue'
@@ -54,38 +54,6 @@ const filteredRunners = computed(() => {
 })
 
 const stats = computed(() => metricsStore.runnerStats)
-
-function getStatusIcon(runner: typeof filteredRunners.value[0]) {
-  if (runner.paused) return Pause
-  if (runner.status === 'online') return Wifi
-  return WifiOff
-}
-
-function getStatusVariant(runner: typeof filteredRunners.value[0]): 'success' | 'destructive' | 'warning' | 'muted' {
-  if (runner.paused) return 'warning'
-  if (runner.status === 'online') return 'success'
-  return 'destructive'
-}
-
-function getStatusLabel(runner: typeof filteredRunners.value[0]) {
-  if (runner.paused) return 'Pausado'
-  if (runner.status === 'online') return 'Online'
-  if (runner.status === 'offline') return 'Offline'
-  return runner.status
-}
-
-function getTypeLabel(type: string) {
-  switch (type) {
-    case 'instance_type':
-      return 'Shared'
-    case 'group_type':
-      return 'Group'
-    case 'project_type':
-      return 'Project'
-    default:
-      return type
-  }
-}
 
 function formatTime(date: string | null) {
   if (!date) return 'Nunca'
@@ -169,7 +137,7 @@ function formatTime(date: string | null) {
                 ]"
               >
                 <component
-                  :is="getStatusIcon(runner)"
+                  :is="getRunnerStatusIcon(runner)"
                   :class="[
                     'h-6 w-6',
                     runner.status === 'online' && !runner.paused
@@ -185,12 +153,12 @@ function formatTime(date: string | null) {
                   {{ runner.description || `Runner #${runner.id}` }}
                 </h4>
                 <p class="text-sm text-muted-foreground">
-                  {{ getTypeLabel(runner.runner_type) }}
+                  {{ getRunnerTypeLabel(runner.runner_type) }}
                 </p>
               </div>
             </div>
-            <Badge :variant="getStatusVariant(runner)">
-              {{ getStatusLabel(runner) }}
+            <Badge :variant="getRunnerStatusVariant(runner)">
+              {{ getRunnerStatusLabel(runner) }}
             </Badge>
           </div>
 
@@ -213,10 +181,10 @@ function formatTime(date: string | null) {
             </div>
           </div>
 
-          <div v-if="runner.tag_list.length > 0" class="mt-4">
+          <div v-if="getRunnerTags(runner).length > 0" class="mt-4">
             <div class="flex flex-wrap gap-1">
               <Badge
-                v-for="tag in runner.tag_list.slice(0, 4)"
+                v-for="tag in getRunnerTags(runner).slice(0, 4)"
                 :key="tag"
                 variant="outline"
                 class="text-xs"
@@ -224,11 +192,11 @@ function formatTime(date: string | null) {
                 {{ tag }}
               </Badge>
               <Badge
-                v-if="runner.tag_list.length > 4"
+                v-if="getRunnerTags(runner).length > 4"
                 variant="muted"
                 class="text-xs"
               >
-                +{{ runner.tag_list.length - 4 }}
+                +{{ getRunnerTags(runner).length - 4 }}
               </Badge>
             </div>
           </div>

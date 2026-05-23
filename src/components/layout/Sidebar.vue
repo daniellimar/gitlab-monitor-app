@@ -7,6 +7,8 @@ import {
   Play,
   Server,
   GitCommit,
+  FolderGit2,
+  Users,
   Settings,
   GitlabIcon,
   ChevronLeft,
@@ -33,10 +35,12 @@ const metricsStore = useMetricsStore()
 
 const navItems = [
   { path: '/', icon: LayoutDashboard, label: 'Dashboard' },
+  { path: '/projects', icon: FolderGit2, label: 'Projetos' },
   { path: '/pipelines', icon: GitBranch, label: 'Pipelines' },
   { path: '/jobs', icon: Play, label: 'Jobs' },
   { path: '/runners', icon: Server, label: 'Runners' },
   { path: '/commits', icon: GitCommit, label: 'Commits' },
+  { path: '/users', icon: Users, label: 'Usuários' },
   { path: '/settings', icon: Settings, label: 'Configurações' },
 ]
 

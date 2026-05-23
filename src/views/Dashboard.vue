@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import { onMounted, onUnmounted } from 'vue'
 import {
   GitBranch,
   XCircle,
@@ -17,29 +16,8 @@ import RecentJobs from '@/components/metrics/RecentJobs.vue'
 import CommitActivity from '@/components/metrics/CommitActivity.vue'
 import Spinner from '@/components/ui/Spinner.vue'
 import { useMetricsStore } from '@/stores/metrics'
-import { useAuthStore } from '@/stores/auth'
 
 const metricsStore = useMetricsStore()
-const authStore = useAuthStore()
-
-let refreshInterval: ReturnType<typeof setInterval> | null = null
-
-onMounted(async () => {
-  if (authStore.isAuthenticated) {
-    await metricsStore.loadAllMetrics()
-    
-    // Set up auto-refresh
-    refreshInterval = setInterval(() => {
-      metricsStore.refreshMetrics()
-    }, metricsStore.refreshInterval)
-  }
-})
-
-onUnmounted(() => {
-  if (refreshInterval) {
-    clearInterval(refreshInterval)
-  }
-})
 </script>
 
 <template>

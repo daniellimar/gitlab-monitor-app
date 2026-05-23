@@ -1,43 +1,14 @@
 <script setup lang="ts">
 import { computed } from 'vue'
-import { CheckCircle2, XCircle, Clock, Play, GitBranch } from 'lucide-vue-next'
+import { GitBranch } from 'lucide-vue-next'
 import Card from '@/components/ui/Card.vue'
 import Badge from '@/components/ui/Badge.vue'
 import { useMetricsStore } from '@/stores/metrics'
-import type { JobStatus } from '@/types/gitlab'
+import { getCiStatusIcon, getCiStatusVariant } from '@/utils/gitlabStatus'
 
 const metricsStore = useMetricsStore()
 
 const recentJobs = computed(() => metricsStore.jobs.slice(0, 8))
-
-function getStatusIcon(status: JobStatus) {
-  switch (status) {
-    case 'success':
-      return CheckCircle2
-    case 'failed':
-      return XCircle
-    case 'running':
-      return Play
-    default:
-      return Clock
-  }
-}
-
-function getStatusVariant(status: JobStatus): 'success' | 'destructive' | 'warning' | 'muted' | 'default' {
-  switch (status) {
-    case 'success':
-      return 'success'
-    case 'failed':
-      return 'destructive'
-    case 'running':
-      return 'default'
-    case 'pending':
-    case 'manual':
-      return 'warning'
-    default:
-      return 'muted'
-  }
-}
 
 function formatDuration(seconds: number | null) {
   if (!seconds) return '-'
@@ -77,7 +48,7 @@ function formatDuration(seconds: number | null) {
           class="flex items-center gap-3 rounded-lg border border-border bg-muted/30 p-3"
       >
         <component
-            :is="getStatusIcon(job.status)"
+            :is="getCiStatusIcon(job.status)"
             :class="[
             'h-5 w-5 flex-shrink-0',
             job.status === 'success' ? 'text-success' :
@@ -97,7 +68,7 @@ function formatDuration(seconds: number | null) {
           </div>
         </div>
         <div class="flex flex-col items-end gap-1">
-          <Badge :variant="getStatusVariant(job.status)" class="text-xs">
+          <Badge :variant="getCiStatusVariant(job.status)" class="text-xs">
             {{ job.status }}
           </Badge>
           <span class="text-xs text-muted-foreground">

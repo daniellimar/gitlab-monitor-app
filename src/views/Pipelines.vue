@@ -2,21 +2,13 @@
 import { computed, ref } from 'vue'
 import { formatDistanceToNow, parseISO } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
-import {
-  CheckCircle2,
-  XCircle,
-  Clock,
-  Play,
-  GitBranch,
-  ExternalLink,
-  Filter,
-} from 'lucide-vue-next'
+import { GitBranch, ExternalLink, Filter } from 'lucide-vue-next'
+import { getCiStatusIcon, getCiStatusVariant } from '@/utils/gitlabStatus'
 import MainLayout from '@/components/layout/MainLayout.vue'
 import Card from '@/components/ui/Card.vue'
 import Badge from '@/components/ui/Badge.vue'
 import Select from '@/components/ui/Select.vue'
 import { useMetricsStore } from '@/stores/metrics'
-import type { PipelineStatus } from '@/types/gitlab'
 
 const metricsStore = useMetricsStore()
 
@@ -55,35 +47,6 @@ const filteredPipelines = computed(() => {
 })
 
 const stats = computed(() => metricsStore.pipelineStats)
-
-function getStatusIcon(status: PipelineStatus) {
-  switch (status) {
-    case 'success':
-      return CheckCircle2
-    case 'failed':
-      return XCircle
-    case 'running':
-      return Play
-    default:
-      return Clock
-  }
-}
-
-function getStatusVariant(status: PipelineStatus): 'success' | 'destructive' | 'warning' | 'muted' | 'default' {
-  switch (status) {
-    case 'success':
-      return 'success'
-    case 'failed':
-      return 'destructive'
-    case 'running':
-      return 'default'
-    case 'pending':
-    case 'manual':
-      return 'warning'
-    default:
-      return 'muted'
-  }
-}
 
 function formatDuration(seconds: number | null | undefined) {
   if (!seconds) return '-'
@@ -174,7 +137,7 @@ function getProjectName(projectId: number) {
                 <td class="px-4 py-3">
                   <div class="flex items-center gap-2">
                     <component
-                      :is="getStatusIcon(pipeline.status)"
+                      :is="getCiStatusIcon(pipeline.status)"
                       :class="[
                         'h-5 w-5',
                         pipeline.status === 'success' ? 'text-success' :
@@ -183,7 +146,7 @@ function getProjectName(projectId: number) {
                         'text-muted-foreground',
                       ]"
                     />
-                    <Badge :variant="getStatusVariant(pipeline.status)">
+                    <Badge :variant="getCiStatusVariant(pipeline.status)">
                       {{ pipeline.status }}
                     </Badge>
                   </div>

@@ -122,39 +122,3 @@
 ::-webkit-scrollbar-thumb:hover {
     background: var(--muted-foreground);
 }
-
-.pwa-install-btn {
-    position: fixed;
-    bottom: 20px;
-    right: 20px;
-
-    background: #1e293b;
-    color: #ffffff;
-
-    padding: 10px 14px;
-    border-radius: 12px;
-
-    font-size: 14px;
-    font-weight: 500;
-
-    border: none;
-    cursor: pointer;
-
-    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.25);
-
-    display: flex;
-    align-items: center;
-    gap: 8px;
-
-    z-index: 9999;
-    transition: all 0.2s ease;
-}
-
-.pwa-install-btn:hover {
-    background: #0f172a;
-    transform: translateY(-2px);
-}
-
-.pwa-install-btn:active {
-    transform: scale(0.96);
-}

@@ -2,6 +2,9 @@
 import { ref } from 'vue'
 import Sidebar from './Sidebar.vue'
 import Header from './Header.vue'
+import { useMetricsRefresh } from '@/composables/useMetricsRefresh'
+
+useMetricsRefresh()
 
 interface Props {
   title?: string

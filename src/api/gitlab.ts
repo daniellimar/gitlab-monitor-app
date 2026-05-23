@@ -1,31 +1,40 @@
 import axios, { AxiosInstance, AxiosError } from 'axios'
 import type { ApiError } from '@/types/gitlab'
+import { getGitlabApiBaseUrl, getGitlabWebUrl } from '@/config/gitlab'
+
+type AuthMode = 'pat' | 'oauth' | null
 
 class GitLabClient {
   private client: AxiosInstance
   private baseUrl: string
   private token: string | null = null
+  private authMode: AuthMode = null
 
   constructor() {
-    this.baseUrl = import.meta.env.VITE_GITLAB_URL || 'https://gitlab.com'
-    
+    this.baseUrl = getGitlabWebUrl()
+
     this.client = axios.create({
-      baseURL: `${this.baseUrl}/api/v4`,
+      baseURL: getGitlabApiBaseUrl(),
       timeout: 30000,
       headers: {
         'Content-Type': 'application/json',
       },
     })
 
-    // Request interceptor to add auth token
     this.client.interceptors.request.use((config) => {
-      if (this.token) {
+      if (!this.token) return config
+
+      if (this.authMode === 'oauth') {
+        config.headers.Authorization = `Bearer ${this.token}`
+        delete config.headers['PRIVATE-TOKEN']
+      } else {
         config.headers['PRIVATE-TOKEN'] = this.token
+        delete config.headers.Authorization
       }
+
       return config
     })
 
-    // Response interceptor for error handling
     this.client.interceptors.response.use(
       (response) => response,
       (error: AxiosError) => {
@@ -38,7 +47,6 @@ class GitLabClient {
       }
     )
 
-    // Initialize with PAT from env if available
     const envToken = import.meta.env.VITE_GITLAB_TOKEN
     if (envToken) {
       this.setToken(envToken)
@@ -47,22 +55,17 @@ class GitLabClient {
 
   setToken(token: string) {
     this.token = token
+    this.authMode = 'pat'
   }
 
   setOAuthToken(token: string) {
     this.token = token
-    // Update interceptor for OAuth (uses Authorization header)
-    this.client.interceptors.request.use((config) => {
-      if (this.token) {
-        config.headers['Authorization'] = `Bearer ${this.token}`
-        delete config.headers['PRIVATE-TOKEN']
-      }
-      return config
-    })
+    this.authMode = 'oauth'
   }
 
   clearToken() {
     this.token = null
+    this.authMode = null
   }
 
   getBaseUrl() {

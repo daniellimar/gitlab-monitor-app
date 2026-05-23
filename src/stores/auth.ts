@@ -2,6 +2,7 @@ import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import type { AuthState, GitLabUser, OAuthTokenResponse } from '@/types/gitlab'
 import gitlabClient from '@/api/gitlab'
+import { getGitlabWebUrl, getOAuthTokenUrl } from '@/config/gitlab'
 
 export const useAuthStore = defineStore('auth', () => {
   // State
@@ -140,7 +141,7 @@ export const useAuthStore = defineStore('auth', () => {
   async function startOAuthFlow() {
     const clientId = import.meta.env.VITE_GITLAB_CLIENT_ID
     const redirectUri = import.meta.env.VITE_GITLAB_REDIRECT_URI
-    const gitlabUrl = import.meta.env.VITE_GITLAB_URL || 'https://gitlab.com'
+    const gitlabUrl = getGitlabWebUrl()
 
     if (!clientId || !redirectUri) {
       error.value = 'OAuth não configurado. Configure VITE_GITLAB_CLIENT_ID e VITE_GITLAB_REDIRECT_URI.'
@@ -179,12 +180,10 @@ export const useAuthStore = defineStore('auth', () => {
 
     const clientId = import.meta.env.VITE_GITLAB_CLIENT_ID
     const redirectUri = import.meta.env.VITE_GITLAB_REDIRECT_URI
-    const gitlabUrl = import.meta.env.VITE_GITLAB_URL || 'https://gitlab.com'
-
     try {
       isLoading.value = true
 
-      const response = await fetch(`${gitlabUrl}/oauth/token`, {
+      const response = await fetch(getOAuthTokenUrl(), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/x-www-form-urlencoded',

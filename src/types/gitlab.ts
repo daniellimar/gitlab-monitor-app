@@ -124,7 +124,7 @@ export interface GitLabRunner {
   name: string | null
   online: boolean
   status: 'online' | 'offline' | 'stale' | 'never_contacted'
-  tag_list: string[]
+  tag_list?: string[]
   contacted_at: string | null
   architecture: string | null
   platform: string | null
@@ -147,6 +147,8 @@ export interface GitLabCommit {
   committed_date: string
   web_url: string
   parent_ids: string[]
+  /** Preenchido ao agregar commits de vários projetos */
+  project_id?: number
   stats?: {
     additions: number
     deletions: number
@@ -161,6 +163,12 @@ export interface GitLabUser {
   state: string
   avatar_url: string
   web_url: string
+}
+
+export interface GitLabGroupMember extends GitLabUser {
+  access_level: number
+  created_at: string
+  expires_at: string | null
 }
 
 // Auth Types
