@@ -91,6 +91,12 @@ const routes = [
     ],
   },
   {
+    path: '/merge-requests',
+    name: 'MergeRequests',
+    component: () => import('@/views/MergeRequests.vue'),
+    meta: { requiresAuth: true },
+  },
+  {
     path: '/users',
     name: 'Users',
     component: () => import('@/views/Users.vue'),

@@ -23,7 +23,7 @@ const lastUpdatedFormatted = computed(() => {
 })
 
 async function handleRefresh() {
-  await metricsStore.refreshMetrics()
+  await metricsStore.refreshMetrics({ bypassCache: true })
 }
 </script>
 

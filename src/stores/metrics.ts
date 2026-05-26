@@ -8,20 +8,28 @@ import type {
   GitLabRunner,
   GitLabCommit,
   GitLabGroupMember,
+  GitLabMergeRequest,
+  GitLabDeployment,
+  GitLabEnvironment,
   DashboardMetrics,
 } from '@/types/gitlab'
 import { getGroup, getGroupProjects } from '@/api/endpoints/groups'
+import gitlabClient from '@/api/gitlab'
 import { getAllGroupPipelines } from '@/api/endpoints/pipelines'
 import { getAllGroupJobs } from '@/api/endpoints/jobs'
 import { getGroupRunners, getRunners } from '@/api/endpoints/runners'
 import { getAllGroupCommits } from '@/api/endpoints/commits'
 import { getAllGroupMembers } from '@/api/endpoints/members'
+import { getAllGroupMergeRequests } from '@/api/endpoints/mergeRequests'
+import { getAllGroupDeployments } from '@/api/endpoints/deployments'
+import { getAllGroupEnvironments } from '@/api/endpoints/environments'
 import {
   calculatePipelineStats,
   calculateJobStats,
   calculateRunnerStats,
   calculateCommitStats,
 } from '@/utils/stats'
+import { calculateDoraMetrics } from '@/utils/stats/dora'
 import { normalizeRunners } from '@/utils/normalize/runner'
 import {
   DEFAULT_COMMIT_PERIOD_DAYS,
@@ -64,6 +72,9 @@ export const useMetricsStore = defineStore('metrics', () => {
   const runners = ref<GitLabRunner[]>([])
   const commits = ref<GitLabCommit[]>([])
   const members = ref<GitLabGroupMember[]>([])
+  const mergeRequests = ref<GitLabMergeRequest[]>([])
+  const deployments = ref<GitLabDeployment[]>([])
+  const environments = ref<GitLabEnvironment[]>([])
 
   const isLoading = ref(false)
   const isLoadingCommits = ref(false)
@@ -89,6 +100,15 @@ export const useMetricsStore = defineStore('metrics', () => {
     const totalCiMinutes = Math.round(totalCiSeconds / 60)
     const estimatedCiCost = Number((totalCiMinutes * CI_COST_PER_MINUTE_USD).toFixed(2))
 
+    const dora = calculateDoraMetrics(
+      deployments.value,
+      commits.value,
+      mergeRequests.value,
+      commitPeriodDays.value
+    )
+
+    const mergedMergeRequests = mergeRequests.value.filter((mr) => mr.state === 'merged').length
+
     return {
       totalPipelines: pipelineStats.value.total,
       successRate: pipelineStats.value.successRate,
@@ -104,6 +124,13 @@ export const useMetricsStore = defineStore('metrics', () => {
       avgJobDurationSec: jobStats.value.avgDuration || 0,
       totalCiMinutes,
       estimatedCiCost,
+      totalDeployments: deployments.value.length,
+      deploymentFrequencyPerDay: dora.deploymentFrequencyPerDay,
+      changeFailureRate: dora.changeFailureRate,
+      meanTimeToRecoverySec: dora.meanTimeToRecoverySec,
+      leadTimeForChangesSec: dora.leadTimeForChangesSec,
+      totalMergeRequests: mergeRequests.value.length,
+      mergedMergeRequests,
     }
   })
 
@@ -210,7 +237,47 @@ export const useMetricsStore = defineStore('metrics', () => {
     }
   }
 
-  async function loadAllMetrics() {
+  async function loadMergeRequests() {
+    if (projects.value.length === 0) return
+
+    try {
+      const since = format(subDays(new Date(), commitPeriodDays.value), "yyyy-MM-dd'T'HH:mm:ss'Z'")
+      mergeRequests.value = await getAllGroupMergeRequests(projects.value, {
+        perPage: 100,
+        updatedAfter: since,
+      })
+    } catch (err) {
+      console.error('Failed to load merge requests:', err)
+    }
+  }
+
+  async function loadDeployments() {
+    if (projects.value.length === 0) return
+
+    try {
+      const since = format(subDays(new Date(), commitPeriodDays.value), "yyyy-MM-dd'T'HH:mm:ss'Z'")
+      deployments.value = await getAllGroupDeployments(projects.value, {
+        perPage: 100,
+        updatedAfter: since,
+      })
+    } catch (err) {
+      console.error('Failed to load deployments:', err)
+    }
+  }
+
+  async function loadEnvironments() {
+    if (projects.value.length === 0) return
+
+    try {
+      environments.value = await getAllGroupEnvironments(projects.value, {
+        perPage: 100,
+      })
+    } catch (err) {
+      console.error('Failed to load environments:', err)
+    }
+  }
+
+  async function loadAllMetrics(options: { bypassCache?: boolean } = {}) {
     if (!groupId.value) {
       error.value = 'ID do grupo não configurado'
       return
@@ -220,16 +287,27 @@ export const useMetricsStore = defineStore('metrics', () => {
     error.value = null
 
     try {
-      await loadGroup()
-      await loadProjects()
+      const executeLoad = async () => {
+        await loadGroup()
+        await loadProjects()
 
-      await Promise.all([
-        loadPipelines(),
-        loadJobs(),
-        loadRunners(),
-        loadCommits(),
-        loadMembers(),
-      ])
+        await Promise.all([
+          loadPipelines(),
+          loadJobs(),
+          loadRunners(),
+          loadCommits(),
+          loadMembers(),
+          loadMergeRequests(),
+          loadDeployments(),
+          loadEnvironments(),
+        ])
+      }
+
+      if (options.bypassCache) {
+        await gitlabClient.withCacheBypass(executeLoad)
+      } else {
+        await executeLoad()
+      }
 
       lastUpdated.value = new Date()
     } catch (err) {
@@ -240,9 +318,9 @@ export const useMetricsStore = defineStore('metrics', () => {
     }
   }
 
-  async function refreshMetrics() {
+  async function refreshMetrics(options: { bypassCache?: boolean } = {}) {
     if (isLoading.value) return
-    await loadAllMetrics()
+    await loadAllMetrics(options)
   }
 
   async function setCommitPeriodDays(days: CommitPeriodDays) {
@@ -275,6 +353,9 @@ export const useMetricsStore = defineStore('metrics', () => {
     runners.value = []
     commits.value = []
     members.value = []
+    mergeRequests.value = []
+    deployments.value = []
+    environments.value = []
   }
 
   function setRefreshInterval(interval: number) {
@@ -289,6 +370,9 @@ export const useMetricsStore = defineStore('metrics', () => {
     runners,
     commits,
     members,
+    mergeRequests,
+    deployments,
+    environments,
     isLoading,
     isLoadingCommits,
     error,
@@ -308,6 +392,9 @@ export const useMetricsStore = defineStore('metrics', () => {
     loadRunners,
     loadCommits,
     loadMembers,
+    loadMergeRequests,
+    loadDeployments,
+    loadEnvironments,
     loadAllMetrics,
     refreshMetrics,
     setCommitPeriodDays,

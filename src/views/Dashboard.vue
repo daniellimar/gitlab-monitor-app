@@ -1,14 +1,14 @@
 <script setup lang="ts">
+import { computed } from 'vue'
 import {
-  GitBranch,
-  XCircle,
-  Play,
-  Server,
-  GitCommit,
-  FolderGit2,
-  TrendingUp,
+  GitMerge,
+  Rocket,
+  Gauge,
+  AlertTriangle,
+  Wrench,
   Clock3,
   DollarSign,
+  Layers,
 } from 'lucide-vue-next'
 import MainLayout from '@/components/layout/MainLayout.vue'
 import MetricCard from '@/components/metrics/MetricCard.vue'
@@ -17,9 +17,41 @@ import RunnersStatus from '@/components/metrics/RunnersStatus.vue'
 import RecentJobs from '@/components/metrics/RecentJobs.vue'
 import CommitActivity from '@/components/metrics/CommitActivity.vue'
 import Spinner from '@/components/ui/Spinner.vue'
+import Card from '@/components/ui/Card.vue'
+import Select from '@/components/ui/Select.vue'
 import { useMetricsStore } from '@/stores/metrics'
 
 const metricsStore = useMetricsStore()
+
+const doraPeriodFilter = computed({
+  get: () => String(metricsStore.commitPeriodDays),
+  set: async (value: string) => {
+    const days = Number(value) as 7 | 30 | 60 | 90 | 180 | 365
+    if (Number.isNaN(days)) return
+    await metricsStore.setCommitPeriodDays(days)
+    await metricsStore.refreshMetrics({ bypassCache: true })
+  },
+})
+
+const periodOptions = [
+  { value: '7', label: 'Últimos 7 dias' },
+  { value: '30', label: 'Últimos 30 dias' },
+  { value: '60', label: 'Últimos 60 dias' },
+  { value: '90', label: 'Últimos 90 dias' },
+  { value: '180', label: 'Últimos 180 dias' },
+  { value: '365', label: 'Últimos 365 dias' },
+]
+
+const environmentsByState = computed(() => {
+  return metricsStore.environments.reduce(
+    (acc, env) => {
+      const key = env.state || 'unknown'
+      acc[key] = (acc[key] || 0) + 1
+      return acc
+    },
+    {} as Record<string, number>
+  )
+})
 
 function formatDuration(seconds: number) {
   if (!seconds) return '-'
@@ -43,111 +75,81 @@ function formatCurrency(value: number) {
 
 <template>
   <MainLayout title="Dashboard">
-    <!-- Loading State -->
     <div
       v-if="metricsStore.isLoading && !metricsStore.lastUpdated"
-      class="flex h-96 items-center justify-center"
+      class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4"
     >
-      <div class="text-center">
-        <Spinner size="xl" class="mx-auto mb-4 text-primary" />
-        <p class="text-muted-foreground">Carregando métricas...</p>
-      </div>
+      <div v-for="i in 8" :key="i" class="h-32 animate-pulse rounded-xl bg-muted" />
     </div>
 
-    <!-- Error State -->
     <div
       v-else-if="metricsStore.error && !metricsStore.lastUpdated"
       class="flex h-96 items-center justify-center"
     >
       <div class="text-center">
-        <XCircle class="mx-auto mb-4 h-12 w-12 text-destructive" />
+        <Spinner size="xl" class="mx-auto mb-4 text-primary" />
         <h3 class="mb-2 text-lg font-semibold text-foreground">Erro ao carregar métricas</h3>
         <p class="mb-4 text-muted-foreground">{{ metricsStore.error }}</p>
-        <button
-          class="text-primary hover:underline"
-          @click="metricsStore.loadAllMetrics"
-        >
+        <button class="text-primary hover:underline" @click="metricsStore.loadAllMetrics({ bypassCache: true })">
           Tentar novamente
         </button>
       </div>
     </div>
 
-    <!-- Dashboard Content -->
     <div v-else class="space-y-6">
-      <!-- Metric Cards -->
+      <Card class="border-white/10 bg-card/70 p-4 backdrop-blur-md">
+        <div class="flex flex-wrap items-center gap-3">
+          <div class="text-sm font-medium text-muted-foreground">Período DORA</div>
+          <Select v-model="doraPeriodFilter" :options="periodOptions" class="w-56" />
+        </div>
+      </Card>
+
       <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <MetricCard
-          title="Total de Pipelines"
-          :value="metricsStore.dashboardMetrics.totalPipelines"
-          subtitle="Últimos 7 dias"
-          :icon="GitBranch"
-        />
-        <MetricCard
-          title="Taxa de Sucesso"
-          :value="`${metricsStore.dashboardMetrics.successRate}%`"
-          subtitle="Pipelines bem-sucedidas"
-          :icon="TrendingUp"
+          title="Deployment Frequency"
+          :value="metricsStore.dashboardMetrics.deploymentFrequencyPerDay"
+          subtitle="deploys/dia"
+          :icon="Gauge"
           variant="success"
         />
         <MetricCard
-          title="Pipelines com Falha"
-          :value="metricsStore.dashboardMetrics.failedPipelines"
-          subtitle="Últimos 7 dias"
-          :icon="XCircle"
-          variant="destructive"
+          title="Lead Time for Changes"
+          :value="formatDuration(metricsStore.dashboardMetrics.leadTimeForChangesSec)"
+          :icon="Clock3"
         />
         <MetricCard
-          title="Em Execução"
-          :value="metricsStore.dashboardMetrics.runningPipelines"
-          subtitle="Agora"
-          :icon="Play"
+          title="Change Failure Rate"
+          :value="`${metricsStore.dashboardMetrics.changeFailureRate}%`"
+          :icon="AlertTriangle"
           variant="warning"
         />
+        <MetricCard
+          title="Mean Time To Recovery"
+          :value="formatDuration(metricsStore.dashboardMetrics.meanTimeToRecoverySec)"
+          :icon="Wrench"
+          variant="destructive"
+        />
       </div>
 
-      <!-- Second Row -->
       <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <MetricCard
-          title="Total de Jobs"
-          :value="metricsStore.dashboardMetrics.totalJobs"
-          :icon="Play"
+          title="Merge Requests"
+          :value="metricsStore.dashboardMetrics.totalMergeRequests"
+          :subtitle="`Merged: ${metricsStore.dashboardMetrics.mergedMergeRequests}`"
+          :icon="GitMerge"
         />
         <MetricCard
-          title="Runners Online"
-          :value="metricsStore.dashboardMetrics.runnersOnline"
-          :subtitle="`${metricsStore.dashboardMetrics.runnersOffline} offline`"
-          :icon="Server"
+          title="Deployments"
+          :value="metricsStore.dashboardMetrics.totalDeployments"
+          subtitle="No período"
+          :icon="Rocket"
           variant="success"
-        />
-        <MetricCard
-          title="Commits Hoje"
-          :value="metricsStore.dashboardMetrics.totalCommitsToday"
-          :icon="GitCommit"
-        />
-        <MetricCard
-          title="Projetos"
-          :value="metricsStore.dashboardMetrics.totalProjects"
-          :icon="FolderGit2"
-        />
-      </div>
-
-      <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <MetricCard
-          title="Tempo Médio Pipeline"
-          :value="formatDuration(metricsStore.dashboardMetrics.avgPipelineDurationSec)"
-          :subtitle="`Fila média: ${formatDuration(metricsStore.dashboardMetrics.avgPipelineQueueDurationSec)}`"
-          :icon="Clock3"
-        />
-        <MetricCard
-          title="Tempo Médio Job"
-          :value="formatDuration(metricsStore.dashboardMetrics.avgJobDurationSec)"
-          :icon="Clock3"
         />
         <MetricCard
           title="Minutos CI"
           :value="metricsStore.dashboardMetrics.totalCiMinutes"
           subtitle="Execução + fila"
-          :icon="Play"
+          :icon="Layers"
           variant="warning"
         />
         <MetricCard
@@ -159,17 +161,32 @@ function formatCurrency(value: number) {
         />
       </div>
 
-      <!-- Charts Row -->
       <div class="grid gap-6 lg:grid-cols-2">
         <PipelineChart />
         <RunnersStatus />
       </div>
 
-      <!-- Bottom Row -->
       <div class="grid gap-6 lg:grid-cols-2">
         <RecentJobs />
         <CommitActivity />
       </div>
+
+      <Card class="p-4">
+        <h3 class="mb-3 text-sm font-semibold text-foreground">Ambientes</h3>
+        <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          <div
+            v-for="(count, state) in environmentsByState"
+            :key="state"
+            class="rounded-lg border border-border bg-muted/40 p-3"
+          >
+            <div class="text-xs uppercase text-muted-foreground">{{ state }}</div>
+            <div class="mt-1 text-xl font-semibold text-foreground">{{ count }}</div>
+          </div>
+          <div v-if="Object.keys(environmentsByState).length === 0" class="text-sm text-muted-foreground">
+            Sem ambientes carregados
+          </div>
+        </div>
+      </Card>
     </div>
   </MainLayout>
 </template>

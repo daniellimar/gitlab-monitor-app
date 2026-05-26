@@ -156,6 +156,55 @@ export interface GitLabCommit {
   }
 }
 
+export type MergeRequestState = 'opened' | 'closed' | 'locked' | 'merged'
+
+export interface GitLabMergeRequest {
+  id: number
+  iid: number
+  project_id: number
+  title: string
+  description: string | null
+  state: MergeRequestState
+  web_url: string
+  created_at: string
+  updated_at: string
+  merged_at: string | null
+  closed_at: string | null
+  draft: boolean
+  source_branch: string
+  target_branch: string
+  author?: GitLabUser
+}
+
+export interface GitLabEnvironment {
+  id: number
+  name: string
+  slug: string
+  state: string
+  external_url: string | null
+  tier?: string
+  updated_at?: string
+}
+
+export interface GitLabDeployment {
+  id: number
+  iid: number
+  ref: string
+  sha: string
+  status: string
+  created_at: string
+  updated_at: string
+  finished_at: string | null
+  project_id?: number
+  environment?: {
+    id: number
+    name: string
+    slug?: string
+    tier?: string
+  }
+  user?: GitLabUser
+}
+
 export interface GitLabUser {
   id: number
   username: string
@@ -205,6 +254,13 @@ export interface DashboardMetrics {
   avgJobDurationSec: number
   totalCiMinutes: number
   estimatedCiCost: number
+  totalDeployments: number
+  deploymentFrequencyPerDay: number
+  changeFailureRate: number
+  meanTimeToRecoverySec: number
+  leadTimeForChangesSec: number
+  totalMergeRequests: number
+  mergedMergeRequests: number
 }
 
 export interface PipelineChartData {

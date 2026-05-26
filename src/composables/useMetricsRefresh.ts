@@ -24,7 +24,7 @@ export function useMetricsRefresh(options: { autoRefresh?: boolean } = {}) {
     if (!autoRefresh || !authStore.isAuthenticated) return
 
     intervalId = setInterval(() => {
-      metricsStore.refreshMetrics()
+      metricsStore.refreshMetrics({ bypassCache: true })
     }, metricsStore.refreshInterval)
   }
 
@@ -49,6 +49,6 @@ export function useMetricsRefresh(options: { autoRefresh?: boolean } = {}) {
 
   return {
     ensureMetricsLoaded,
-    refreshMetrics: () => metricsStore.refreshMetrics(),
+    refreshMetrics: () => metricsStore.refreshMetrics({ bypassCache: true }),
   }
 }

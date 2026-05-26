@@ -13,6 +13,7 @@ import {
   GitlabIcon,
   ChevronLeft,
   ChevronRight,
+  GitMerge,
 } from 'lucide-vue-next'
 import { useAuthStore } from '@/stores/auth'
 import { useMetricsStore } from '@/stores/metrics'
@@ -40,6 +41,7 @@ const navItems = [
   { path: '/jobs', icon: Play, label: 'Jobs' },
   { path: '/runners', icon: Server, label: 'Runners' },
   { path: '/commits', icon: GitCommit, label: 'Commits' },
+  { path: '/merge-requests', icon: GitMerge, label: 'Merge Requests' },
   { path: '/users', icon: Users, label: 'Usuários' },
   { path: '/settings', icon: Settings, label: 'Configurações' },
 ]
