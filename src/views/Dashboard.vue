@@ -7,6 +7,8 @@ import {
   GitCommit,
   FolderGit2,
   TrendingUp,
+  Clock3,
+  DollarSign,
 } from 'lucide-vue-next'
 import MainLayout from '@/components/layout/MainLayout.vue'
 import MetricCard from '@/components/metrics/MetricCard.vue'
@@ -18,6 +20,25 @@ import Spinner from '@/components/ui/Spinner.vue'
 import { useMetricsStore } from '@/stores/metrics'
 
 const metricsStore = useMetricsStore()
+
+function formatDuration(seconds: number) {
+  if (!seconds) return '-'
+  if (seconds < 60) return `${seconds}s`
+  const minutes = Math.floor(seconds / 60)
+  const remainingSeconds = seconds % 60
+  if (minutes < 60) return `${minutes}m ${remainingSeconds}s`
+  const hours = Math.floor(minutes / 60)
+  const remainingMinutes = minutes % 60
+  return `${hours}h ${remainingMinutes}m`
+}
+
+function formatCurrency(value: number) {
+  return new Intl.NumberFormat('pt-BR', {
+    style: 'currency',
+    currency: 'USD',
+    minimumFractionDigits: 2,
+  }).format(value)
+}
 </script>
 
 <template>
@@ -107,6 +128,34 @@ const metricsStore = useMetricsStore()
           title="Projetos"
           :value="metricsStore.dashboardMetrics.totalProjects"
           :icon="FolderGit2"
+        />
+      </div>
+
+      <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <MetricCard
+          title="Tempo Médio Pipeline"
+          :value="formatDuration(metricsStore.dashboardMetrics.avgPipelineDurationSec)"
+          :subtitle="`Fila média: ${formatDuration(metricsStore.dashboardMetrics.avgPipelineQueueDurationSec)}`"
+          :icon="Clock3"
+        />
+        <MetricCard
+          title="Tempo Médio Job"
+          :value="formatDuration(metricsStore.dashboardMetrics.avgJobDurationSec)"
+          :icon="Clock3"
+        />
+        <MetricCard
+          title="Minutos CI"
+          :value="metricsStore.dashboardMetrics.totalCiMinutes"
+          subtitle="Execução + fila"
+          :icon="Play"
+          variant="warning"
+        />
+        <MetricCard
+          title="Custo Estimado CI"
+          :value="formatCurrency(metricsStore.dashboardMetrics.estimatedCiCost)"
+          subtitle="Estimativa USD"
+          :icon="DollarSign"
+          variant="destructive"
         />
       </div>
 

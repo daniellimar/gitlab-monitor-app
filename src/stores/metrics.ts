@@ -30,6 +30,8 @@ import {
 } from '@/constants/periods'
 import { format, subDays } from 'date-fns'
 
+const CI_COST_PER_MINUTE_USD = Number(import.meta.env.VITE_CI_COST_PER_MINUTE_USD || '0.008')
+
 const GROUP_ID_STORAGE_KEY = 'gitlab_monitor_group_id'
 const COMMIT_PERIOD_STORAGE_KEY = 'gitlab_monitor_commit_period_days'
 
@@ -79,17 +81,31 @@ export const useMetricsStore = defineStore('metrics', () => {
     calculateCommitStats(commits.value, commitPeriodDays.value)
   )
 
-  const dashboardMetrics = computed<DashboardMetrics>(() => ({
-    totalPipelines: pipelineStats.value.total,
-    successRate: pipelineStats.value.successRate,
-    failedPipelines: pipelineStats.value.failed,
-    runningPipelines: pipelineStats.value.running,
-    totalJobs: jobStats.value.total,
-    runnersOnline: runnerStats.value.online,
-    runnersOffline: runnerStats.value.offline,
-    totalCommitsToday: commitStats.value.todayCommits,
-    totalProjects: projects.value.length,
-  }))
+  const dashboardMetrics = computed<DashboardMetrics>(() => {
+    const totalCiSeconds =
+      (pipelineStats.value.totalDuration || 0) +
+      (jobStats.value.totalDuration || 0) +
+      (pipelineStats.value.totalQueuedDuration || 0)
+    const totalCiMinutes = Math.round(totalCiSeconds / 60)
+    const estimatedCiCost = Number((totalCiMinutes * CI_COST_PER_MINUTE_USD).toFixed(2))
+
+    return {
+      totalPipelines: pipelineStats.value.total,
+      successRate: pipelineStats.value.successRate,
+      failedPipelines: pipelineStats.value.failed,
+      runningPipelines: pipelineStats.value.running,
+      totalJobs: jobStats.value.total,
+      runnersOnline: runnerStats.value.online,
+      runnersOffline: runnerStats.value.offline,
+      totalCommitsToday: commitStats.value.todayCommits,
+      totalProjects: projects.value.length,
+      avgPipelineDurationSec: pipelineStats.value.avgDuration || 0,
+      avgPipelineQueueDurationSec: pipelineStats.value.avgQueuedDuration || 0,
+      avgJobDurationSec: jobStats.value.avgDuration || 0,
+      totalCiMinutes,
+      estimatedCiCost,
+    }
+  })
 
   async function loadGroup() {
     if (!groupId.value) {
@@ -187,10 +203,8 @@ export const useMetricsStore = defineStore('metrics', () => {
   }
 
   async function loadMembers() {
-    if (!groupId.value) return
-
     try {
-      members.value = await getAllGroupMembers(groupId.value)
+      members.value = await getAllGroupMembers()
     } catch (err) {
       console.error('Failed to load members:', err)
     }

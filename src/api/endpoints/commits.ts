@@ -74,14 +74,15 @@ export async function getAllGroupCommits(
   options: {
     perPage?: number
     since?: string
+    withStats?: boolean
   } = {}
 ): Promise<GitLabCommit[]> {
-  const { perPage = 100, since } = options
+  const { perPage = 100, since, withStats = false } = options
 
   const results = await Promise.all(
     projects.slice(0, DEFAULT_PROJECT_BATCH).map(async (project) => {
       try {
-        const { data } = await getProjectCommits(project.id, { perPage, since })
+        const { data } = await getProjectCommits(project.id, { perPage, since, withStats })
         return data.map((commit) => ({ ...commit, project_id: project.id }))
       } catch {
         return [] as GitLabCommit[]
@@ -90,4 +91,60 @@ export async function getAllGroupCommits(
   )
 
   return results.flat()
+}
+
+export async function getAllUserCommitsAcrossProjects(
+  projects: { id: number }[],
+  options: {
+    perPage?: number
+    since?: string
+    until?: string
+    authorName?: string
+    authorEmail?: string
+  } = {}
+): Promise<GitLabCommit[]> {
+  const { perPage = 100, since, until, authorName, authorEmail } = options
+  const normalizedName = (authorName || '').trim().toLowerCase()
+  const normalizedEmail = (authorEmail || '').trim().toLowerCase()
+
+  const allCommits = await Promise.all(
+    projects.map(async (project) => {
+      try {
+        const commits: GitLabCommit[] = []
+        let page = 1
+
+        while (true) {
+          const { data } = await getProjectCommits(project.id, {
+            page,
+            perPage,
+            since,
+            until,
+            withStats: true,
+          })
+
+          if (data.length === 0) break
+
+          const filtered = data.filter((commit) => {
+            const commitName = commit.author_name.trim().toLowerCase()
+            const commitEmail = commit.author_email.trim().toLowerCase()
+            return (
+              (normalizedName && commitName === normalizedName) ||
+              (normalizedEmail && commitEmail === normalizedEmail)
+            )
+          })
+
+          commits.push(...filtered.map((commit) => ({ ...commit, project_id: project.id })))
+
+          if (data.length < perPage) break
+          page += 1
+        }
+
+        return commits
+      } catch {
+        return [] as GitLabCommit[]
+      }
+    })
+  )
+
+  return allCommits.flat()
 }
