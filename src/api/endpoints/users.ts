@@ -1,5 +1,6 @@
 import gitlabClient from '../gitlab'
 import { parseTotalHeader } from '../utils'
+import gitlabGraphqlClient from '@/graphql/client'
 import type { GitLabUser } from '@/types/gitlab'
 
 export async function getUser(userId: string | number): Promise<GitLabUser> {
@@ -119,4 +120,100 @@ export async function getAllUserEvents(
   }
 
   return events
+}
+
+export interface UserGraphqlSummary {
+  contributedProjectsCount: number
+  mergeRequestsCount: number
+  assignedMergeRequestsCount: number
+  reviewRequestedMergeRequestsCount: number
+  starredProjectsCount: number
+  topGroups: Array<{ fullPath: string; name: string }>
+}
+
+interface UserGraphqlSummaryResponse {
+  user?: {
+    contributedProjects?: {
+      count?: number
+    }
+    authoredMergeRequests?: {
+      count?: number
+    }
+    assignedMergeRequests?: {
+      count?: number
+    }
+    reviewRequestedMergeRequests?: {
+      count?: number
+    }
+    starredProjects?: {
+      count?: number
+    }
+    groups?: {
+      nodes?: Array<{ fullPath?: string; name?: string }>
+    }
+  }
+}
+
+const USER_GRAPHQL_SUMMARY_QUERY = `query UserSummary($username: String!) {
+  user(username: $username) {
+    contributedProjects {
+      count
+    }
+    authoredMergeRequests {
+      count
+    }
+    assignedMergeRequests {
+      count
+    }
+    reviewRequestedMergeRequests {
+      count
+    }
+    starredProjects {
+      count
+    }
+    groups(first: 10) {
+      nodes {
+        fullPath
+        name
+      }
+    }
+  }
+}`
+
+export async function getUserGraphqlSummary(
+  username: string
+): Promise<UserGraphqlSummary | null> {
+  if (!username.trim()) return null
+
+  const response = await gitlabGraphqlClient.request<UserGraphqlSummaryResponse>(
+    {
+      query: USER_GRAPHQL_SUMMARY_QUERY,
+      operationName: 'UserSummary',
+      variables: { username },
+    },
+    {
+      debugLabel: 'user-summary',
+      batchable: true,
+      skipCache: true,
+    }
+  )
+
+  const user = response.user
+  if (!user) return null
+
+  const topGroups = (user.groups?.nodes || [])
+    .map((group) => ({
+      fullPath: String(group.fullPath || ''),
+      name: String(group.name || ''),
+    }))
+    .filter((group) => group.fullPath || group.name)
+
+  return {
+    contributedProjectsCount: Number(user.contributedProjects?.count || 0),
+    mergeRequestsCount: Number(user.authoredMergeRequests?.count || 0),
+    assignedMergeRequestsCount: Number(user.assignedMergeRequests?.count || 0),
+    reviewRequestedMergeRequestsCount: Number(user.reviewRequestedMergeRequests?.count || 0),
+    starredProjectsCount: Number(user.starredProjects?.count || 0),
+    topGroups,
+  }
 }

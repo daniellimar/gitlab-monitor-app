@@ -5,7 +5,12 @@ import { format, parseISO, subDays } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 import { Users, ExternalLink, GitCommit, Loader2 } from 'lucide-vue-next'
 import {
+  getAllUserEvents,
+  getAllUserIssues,
+  getAllUserMergeRequests,
   getUserFull,
+  getUserGraphqlSummary,
+  type UserGraphqlSummary,
 } from '@/api/endpoints/users'
 import { getGroupMember } from '@/api/endpoints/members'
 import { getAllUserCommitsAcrossProjects } from '@/api/endpoints/commits'
@@ -35,6 +40,7 @@ const userCommits365 = ref(metricsStore.commits)
 const userIssues = ref<Record<string, unknown>[]>([])
 const userMergeRequests = ref<Record<string, unknown>[]>([])
 const userEvents = ref<Record<string, unknown>[]>([])
+const userGraphqlSummary = ref<UserGraphqlSummary | null>(null)
 const isLoading = ref(false)
 
 const displayName = computed(() => {
@@ -62,7 +68,7 @@ const userJobs = computed(() => {
 })
 
 const userProjects = computed(() => {
-  const map = new Map<number, { id: number; name: string; web_url: string; jobs: number; ciMinutes: number; cost: number; commits: number }>()
+  const map = new Map<number, { id: number; name: string; web_url: string; jobs: number; ciMinutes: number; cost: number; commits: number; mergeRequests: number; issues: number }>()
 
   for (const project of metricsStore.projects) {
     map.set(project.id, {
@@ -73,6 +79,8 @@ const userProjects = computed(() => {
       ciMinutes: 0,
       cost: 0,
       commits: 0,
+      mergeRequests: 0,
+      issues: 0,
     })
   }
 
@@ -89,6 +97,8 @@ const userProjects = computed(() => {
         ciMinutes: 0,
         cost: 0,
         commits: 0,
+        mergeRequests: 0,
+        issues: 0,
       })
     }
 
@@ -114,6 +124,8 @@ const userProjects = computed(() => {
         ciMinutes: 0,
         cost: 0,
         commits: 0,
+        mergeRequests: 0,
+        issues: 0,
       })
     }
 
@@ -121,10 +133,54 @@ const userProjects = computed(() => {
     if (item) item.commits += 1
   }
 
+  for (const mergeRequest of userMergeRequests.value) {
+    const projectId = Number(mergeRequest.project_id || 0)
+    if (!projectId) continue
+    if (!map.has(projectId)) {
+      const project = metricsStore.projects.find((p) => p.id === projectId)
+      map.set(projectId, {
+        id: projectId,
+        name: project?.name || `Projeto ${projectId}`,
+        web_url: project?.web_url || '',
+        jobs: 0,
+        ciMinutes: 0,
+        cost: 0,
+        commits: 0,
+        mergeRequests: 0,
+        issues: 0,
+      })
+    }
+
+    const item = map.get(projectId)
+    if (item) item.mergeRequests += 1
+  }
+
+  for (const issue of userIssues.value) {
+    const projectId = Number(issue.project_id || 0)
+    if (!projectId) continue
+    if (!map.has(projectId)) {
+      const project = metricsStore.projects.find((p) => p.id === projectId)
+      map.set(projectId, {
+        id: projectId,
+        name: project?.name || `Projeto ${projectId}`,
+        web_url: project?.web_url || '',
+        jobs: 0,
+        ciMinutes: 0,
+        cost: 0,
+        commits: 0,
+        mergeRequests: 0,
+        issues: 0,
+      })
+    }
+
+    const item = map.get(projectId)
+    if (item) item.issues += 1
+  }
+
   return Array.from(map.values())
-    .filter((item) => item.jobs > 0 || item.commits > 0)
+    .filter((item) => item.jobs > 0 || item.commits > 0 || item.mergeRequests > 0 || item.issues > 0)
     .map((item) => ({ ...item, cost: Number(item.cost.toFixed(2)) }))
-    .sort((a, b) => (b.commits + b.jobs) - (a.commits + a.jobs))
+    .sort((a, b) => (b.commits + b.jobs + b.mergeRequests + b.issues) - (a.commits + a.jobs + a.mergeRequests + a.issues))
 })
 
 const userStats = computed(() => {
@@ -164,6 +220,8 @@ const userStats = computed(() => {
 
   const wikiEvents = userEvents.value.filter((event) => String(event.target_type || '').toLowerCase() === 'wiki_page').length
 
+  const graphqlSummary = userGraphqlSummary.value
+
   return {
     totalJobs,
     successJobs,
@@ -188,6 +246,11 @@ const userStats = computed(() => {
     mergedMrs,
     closedMrs,
     wikiEvents,
+    contributedProjectsCount: graphqlSummary?.contributedProjectsCount || 0,
+    starredProjectsCount: graphqlSummary?.starredProjectsCount || 0,
+    assignedMergeRequestsCount: graphqlSummary?.assignedMergeRequestsCount || 0,
+    reviewRequestedMergeRequestsCount: graphqlSummary?.reviewRequestedMergeRequestsCount || 0,
+    topGroups: graphqlSummary?.topGroups || [],
   }
 })
 
@@ -199,33 +262,74 @@ async function load() {
   isLoading.value = true
 
   try {
-    const since365 = subDays(new Date(), 365).toISOString()
+    const sinceDate = subDays(new Date(), 365)
+    const since365 = sinceDate.toISOString()
 
     const [userFull, groupMember] = await Promise.all([
       getUserFull(userId.value).catch(() => ({})),
       metricsStore.groupId
-          ? getGroupMember(metricsStore.groupId, userId.value).catch(() => null)
-          : Promise.resolve(null),
+        ? getGroupMember(metricsStore.groupId, userId.value).catch(() => null)
+        : Promise.resolve(null),
     ])
 
     apiPayload.value = mergeApiRecords(
-        member.value,
-        userFull,
-        groupMember ? { group_membership: groupMember } : undefined
+      apiPayload.value,
+      member.value,
+      userFull,
+      groupMember ? { group_membership: groupMember } : undefined
     )
 
-    const email = String((userFull as any).email || '')
+    const email = String((userFull as any).email || apiPayload.value.email || '')
+    const username = String((userFull as any).username || member.value?.username || apiPayload.value.username || '')
+    const name = String((userFull as any).name || member.value?.name || apiPayload.value.name || '')
 
-    const commits365 = email
-        ? await getAllUserCommitsAcrossProjects(metricsStore.projects, {
-          perPage: 100,
-          since: since365,
-          authorEmail: email,
-        })
-        : []
+    const fallbackCommits = metricsStore.commits
+      .filter((commit) => {
+        const commitDate = new Date(commit.committed_date)
+        if (Number.isNaN(commitDate.getTime()) || commitDate < sinceDate) return false
+        const commitEmail = String(commit.author_email || '').toLowerCase()
+        const commitName = String(commit.author_name || '').toLowerCase()
+        if (email && commitEmail === email.toLowerCase()) return true
+        if (username && commitEmail.includes(username.toLowerCase())) return true
+        return Boolean(name) && commitName === name.toLowerCase()
+      })
+      .sort((a, b) => new Date(b.committed_date).getTime() - new Date(a.committed_date).getTime())
 
-    userCommits365.value = commits365
+    const [commits365, issues, mergeRequests, events, graphqlSummary] = await Promise.all([
+      email
+        ? getAllUserCommitsAcrossProjects(metricsStore.projects, {
+            perPage: 100,
+            since: since365,
+            authorEmail: email,
+          }).catch(() => null)
+        : Promise.resolve(null),
+      getAllUserIssues(userId.value, { perPage: 100, state: 'all' }).catch(() => null),
+      getAllUserMergeRequests(userId.value, { perPage: 100, state: 'all' }).catch(() => null),
+      getAllUserEvents(userId.value, { perPage: 100 }).catch(() => null),
+      username ? getUserGraphqlSummary(username).catch(() => null) : Promise.resolve(null),
+    ])
 
+    if (commits365 && commits365.length >= 0) {
+      userCommits365.value = commits365.length ? commits365 : fallbackCommits
+    } else if (!userCommits365.value.length && fallbackCommits.length) {
+      userCommits365.value = fallbackCommits
+    }
+
+    if (issues) {
+      userIssues.value = issues
+    }
+
+    if (mergeRequests) {
+      userMergeRequests.value = mergeRequests
+    }
+
+    if (events) {
+      userEvents.value = events
+    }
+
+    if (graphqlSummary) {
+      userGraphqlSummary.value = graphqlSummary
+    }
   } finally {
     isLoading.value = false
     loadingLock.value = false
@@ -371,12 +475,34 @@ watch(
         <p class="mt-1 text-xs text-muted-foreground">Open {{ userStats.openedIssues }} | Closed {{ userStats.closedIssues }}</p>
       </Card>
       <Card class="p-4">
+        <div class="text-sm text-muted-foreground">Projetos com contribuição (GraphQL)</div>
+        <div class="mt-1 text-2xl font-bold text-foreground">{{ userStats.contributedProjectsCount }}</div>
+        <p class="mt-1 text-xs text-muted-foreground">Review requests: {{ userStats.reviewRequestedMergeRequestsCount }}</p>
+      </Card>
+      <Card class="p-4">
+        <div class="text-sm text-muted-foreground">Projetos favoritos (GraphQL)</div>
+        <div class="mt-1 text-2xl font-bold text-foreground">{{ userStats.starredProjectsCount }}</div>
+        <p class="mt-1 text-xs text-muted-foreground">MRs atribuídas: {{ userStats.assignedMergeRequestsCount }}</p>
+      </Card>
+    </div>
+
+    <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <Card class="p-4">
         <div class="text-sm text-muted-foreground">Wiki events</div>
         <div class="mt-1 text-2xl font-bold text-foreground">{{ userStats.wikiEvents }}</div>
       </Card>
       <Card class="p-4">
         <div class="text-sm text-muted-foreground">Mudanças de código</div>
         <div class="mt-1 text-2xl font-bold text-foreground">{{ userStats.totalChanges }}</div>
+      </Card>
+      <Card class="p-4 sm:col-span-2 lg:col-span-2">
+        <div class="text-sm text-muted-foreground">Top grupos (GraphQL)</div>
+        <div v-if="userStats.topGroups.length" class="mt-2 flex flex-wrap gap-2">
+          <Badge v-for="group in userStats.topGroups" :key="group.fullPath || group.name" variant="secondary">
+            {{ group.name || group.fullPath }}
+          </Badge>
+        </div>
+        <p v-else class="mt-2 text-xs text-muted-foreground">Sem grupos retornados na consulta GraphQL.</p>
       </Card>
     </div>
 
@@ -408,7 +534,7 @@ watch(
         <div v-for="project in userProjects" :key="project.id" class="flex items-center justify-between rounded-lg border border-border px-3 py-2">
           <div class="min-w-0">
             <p class="truncate text-sm font-medium text-foreground">{{ project.name }}</p>
-            <p class="text-xs text-muted-foreground">{{ project.commits }} commits · {{ project.jobs }} jobs · {{ project.ciMinutes }} min</p>
+            <p class="text-xs text-muted-foreground">{{ project.commits }} commits · {{ project.jobs }} jobs · {{ project.mergeRequests }} MRs · {{ project.issues }} issues · {{ project.ciMinutes }} min</p>
           </div>
           <div class="text-right">
             <p class="text-sm text-foreground">{{ formatCurrency(project.cost) }}</p>
