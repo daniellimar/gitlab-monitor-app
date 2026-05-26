@@ -189,6 +189,9 @@ async function runQueryBuilder() {
       after: null,
     },
   })
+
+  selectedDetailTitle.value = 'Payload completo da consulta'
+  selectedDetailPayload.value = graphqlStore.dashboardData
 }
 
 /**
@@ -357,22 +360,99 @@ const commit = computed<any | null>(() => {
   )
 })
 
-/**
- * Erros GraphQL amigáveis
- */
-// const graphqlErrors = computed(() => {
-//   const error = graphqlStore.error
-//
-//   if (!error) {
-//     return []
-//   }
-//
-//   if (Array.isArray(error)) {
-//     return error
-//   }
-//
-//   return [error]
-// })
+const selectedDetailTitle = ref<string>('Nenhum item selecionado')
+const selectedDetailPayload = ref<unknown>(null)
+
+const metricCards = computed(() => [
+  {
+    key: 'pipelines',
+    label: 'Pipelines',
+    count: pipelines.value.length,
+    payload: pipelines.value,
+  },
+  {
+    key: 'deployments',
+    label: 'Deployments',
+    count: deployments.value.length,
+    payload: deployments.value,
+  },
+  {
+    key: 'mergeRequests',
+    label: 'Merge Requests',
+    count: mergeRequests.value.length,
+    payload: mergeRequests.value,
+  },
+  {
+    key: 'jobs',
+    label: 'Jobs',
+    count: jobs.value.length,
+    payload: jobs.value,
+  },
+  {
+    key: 'environments',
+    label: 'Environments',
+    count: environments.value.length,
+    payload: environments.value,
+  },
+  {
+    key: 'commit',
+    label: 'Commit',
+    count: commit.value ? 1 : 0,
+    payload: commit.value,
+  },
+])
+
+function showCardDetails(card: {
+  label: string
+  count: number
+  payload: unknown
+}) {
+  selectedDetailTitle.value = `${card.label} (${card.count})`
+  selectedDetailPayload.value = card.payload
+}
+
+const expandedDeployments = ref<string[]>([])
+const expandedMergeRequests = ref<string[]>([])
+
+function getDeploymentKey(item: any): string {
+  return String(item?.id || `${item?.status || 'deployment'}-${item?.ref || ''}`)
+}
+
+function getMergeRequestKey(item: any): string {
+  return String(item?.id || item?.iid || item?.title || 'mr')
+}
+
+function toggleDeploymentExpand(item: any) {
+  const key = getDeploymentKey(item)
+  if (expandedDeployments.value.includes(key)) {
+    expandedDeployments.value = expandedDeployments.value.filter((value) => value !== key)
+    return
+  }
+  expandedDeployments.value = [...expandedDeployments.value, key]
+}
+
+function toggleMergeRequestExpand(item: any) {
+  const key = getMergeRequestKey(item)
+  if (expandedMergeRequests.value.includes(key)) {
+    expandedMergeRequests.value = expandedMergeRequests.value.filter((value) => value !== key)
+    return
+  }
+  expandedMergeRequests.value = [...expandedMergeRequests.value, key]
+}
+
+function isDeploymentExpanded(item: any): boolean {
+  return expandedDeployments.value.includes(getDeploymentKey(item))
+}
+
+function isMergeRequestExpanded(item: any): boolean {
+  return expandedMergeRequests.value.includes(getMergeRequestKey(item))
+}
+
+function showRowDetails(type: string, item: any) {
+  const identity = item?.id || item?.iid || item?.shortId || '-'
+  selectedDetailTitle.value = `${type} ${identity}`
+  selectedDetailPayload.value = item
+}
 </script>
 
 <template>
@@ -499,30 +579,15 @@ const commit = computed<any | null>(() => {
           {{ graphqlStore.error }}
         </div>
         <div v-else class="grid gap-4 sm:grid-cols-2 lg:grid-cols-6">
-          <div class="rounded-lg border border-border p-3">
-            <div class="text-xs text-muted-foreground">Pipelines</div>
-            <div class="text-2xl font-semibold text-foreground">{{ pipelines.length }}</div>
-          </div>
-          <div class="rounded-lg border border-border p-3">
-            <div class="text-xs text-muted-foreground">Deployments</div>
-            <div class="text-2xl font-semibold text-foreground">{{ deployments.length }}</div>
-          </div>
-          <div class="rounded-lg border border-border p-3">
-            <div class="text-xs text-muted-foreground">Merge Requests</div>
-            <div class="text-2xl font-semibold text-foreground">{{ mergeRequests.length }}</div>
-          </div>
-          <div class="rounded-lg border border-border p-3">
-            <div class="text-xs text-muted-foreground">Jobs</div>
-            <div class="text-2xl font-semibold text-foreground">{{ jobs.length }}</div>
-          </div>
-          <div class="rounded-lg border border-border p-3">
-            <div class="text-xs text-muted-foreground">Environments</div>
-            <div class="text-2xl font-semibold text-foreground">{{ environments.length }}</div>
-          </div>
-          <div class="rounded-lg border border-border p-3">
-            <div class="text-xs text-muted-foreground">Commit</div>
-            <div class="truncate text-sm font-semibold text-foreground">{{ commit?.shortId || '-' }}</div>
-          </div>
+          <button
+            v-for="card in metricCards"
+            :key="card.key"
+            class="rounded-lg border border-border p-3 text-left transition hover:border-primary/40 hover:bg-primary/5"
+            @click="showCardDetails(card)"
+          >
+            <div class="text-xs text-muted-foreground">{{ card.label }}</div>
+            <div class="text-2xl font-semibold text-foreground">{{ card.count }}</div>
+          </button>
         </div>
       </Card>
 
@@ -539,17 +604,33 @@ const commit = computed<any | null>(() => {
                   <th class="py-2 text-left text-muted-foreground">ID</th>
                   <th class="py-2 text-left text-muted-foreground">Status</th>
                   <th class="py-2 text-left text-muted-foreground">Ref</th>
+                  <th class="py-2 text-left text-muted-foreground">Projeto</th>
+                  <th class="py-2 text-left text-muted-foreground">Atualizado</th>
                 </tr>
               </thead>
               <tbody>
-                <tr v-for="item in deployments.slice(0, 20)" :key="item.id" class="border-b border-border/50">
-                  <td class="py-2 text-foreground">{{ item.id }}</td>
-                  <td class="py-2 text-muted-foreground">{{ item.status }}</td>
-                  <td class="py-2 text-muted-foreground">{{ item.ref }}</td>
-                </tr>
+                <template v-for="item in deployments.slice(0, 20)" :key="getDeploymentKey(item)">
+                  <tr
+                    class="cursor-pointer border-b border-border/50 hover:bg-muted/50"
+                    @click="showRowDetails('Deployment', item)"
+                    @dblclick="toggleDeploymentExpand(item)"
+                  >
+                    <td class="py-2 text-foreground">{{ item.id }}</td>
+                    <td class="py-2 text-muted-foreground">{{ item.status || '-' }}</td>
+                    <td class="py-2 text-muted-foreground">{{ item.ref || '-' }}</td>
+                    <td class="py-2 text-muted-foreground">{{ item.projectName || item.project?.name || '-' }}</td>
+                    <td class="py-2 text-muted-foreground">{{ item.updatedAt || item.finishedAt || '-' }}</td>
+                  </tr>
+                  <tr v-if="isDeploymentExpanded(item)" class="border-b border-border/50 bg-muted/30">
+                    <td colspan="5" class="py-2">
+                      <pre class="max-h-52 overflow-auto rounded-md bg-muted p-2 text-xs text-foreground">{{ JSON.stringify(item, null, 2) }}</pre>
+                    </td>
+                  </tr>
+                </template>
               </tbody>
             </table>
           </div>
+          <p class="mt-2 text-xs text-muted-foreground">Dica: duplo clique para expandir/recolher JSON completo da linha.</p>
         </Card>
 
         <Card class="p-4">
@@ -564,19 +645,44 @@ const commit = computed<any | null>(() => {
                   <th class="py-2 text-left text-muted-foreground">IID</th>
                   <th class="py-2 text-left text-muted-foreground">Estado</th>
                   <th class="py-2 text-left text-muted-foreground">Título</th>
+                  <th class="py-2 text-left text-muted-foreground">Autor</th>
+                  <th class="py-2 text-left text-muted-foreground">Atualizado</th>
                 </tr>
               </thead>
               <tbody>
-                <tr v-for="item in mergeRequests.slice(0, 20)" :key="item.id" class="border-b border-border/50">
-                  <td class="py-2 text-foreground">{{ item.iid }}</td>
-                  <td class="py-2 text-muted-foreground">{{ item.state }}</td>
-                  <td class="truncate py-2 text-muted-foreground">{{ item.title }}</td>
-                </tr>
+                <template v-for="item in mergeRequests.slice(0, 20)" :key="getMergeRequestKey(item)">
+                  <tr
+                    class="cursor-pointer border-b border-border/50 hover:bg-muted/50"
+                    @click="showRowDetails('Merge Request', item)"
+                    @dblclick="toggleMergeRequestExpand(item)"
+                  >
+                    <td class="py-2 text-foreground">{{ item.iid || '-' }}</td>
+                    <td class="py-2 text-muted-foreground">{{ item.state || '-' }}</td>
+                    <td class="truncate py-2 text-muted-foreground">{{ item.title || '-' }}</td>
+                    <td class="py-2 text-muted-foreground">{{ item.author?.name || item.author?.username || '-' }}</td>
+                    <td class="py-2 text-muted-foreground">{{ item.updatedAt || item.createdAt || '-' }}</td>
+                  </tr>
+                  <tr v-if="isMergeRequestExpanded(item)" class="border-b border-border/50 bg-muted/30">
+                    <td colspan="5" class="py-2">
+                      <pre class="max-h-52 overflow-auto rounded-md bg-muted p-2 text-xs text-foreground">{{ JSON.stringify(item, null, 2) }}</pre>
+                    </td>
+                  </tr>
+                </template>
               </tbody>
             </table>
           </div>
+          <p class="mt-2 text-xs text-muted-foreground">Dica: duplo clique para expandir/recolher JSON completo da linha.</p>
         </Card>
       </div>
+
+      <Card class="p-4">
+        <div class="mb-2 flex items-center gap-2 text-sm font-semibold text-foreground">
+          <Database class="h-4 w-4" />
+          Detalhes selecionados
+        </div>
+        <div class="mb-2 text-sm font-medium text-foreground">{{ selectedDetailTitle }}</div>
+        <pre class="max-h-80 overflow-auto rounded-md bg-muted p-3 text-xs text-foreground">{{ JSON.stringify(selectedDetailPayload, null, 2) }}</pre>
+      </Card>
 
       <Card class="p-4">
         <div class="mb-2 flex items-center gap-2 text-sm font-semibold text-foreground">

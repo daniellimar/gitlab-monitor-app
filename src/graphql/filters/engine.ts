@@ -18,7 +18,13 @@ export interface AnalyticsFilters {
   group?: string[]
 }
 
-export type FilterScope = 'pipelines' | 'deployments' | 'mergeRequests' | 'commits'
+export type FilterScope =
+  | 'pipelines'
+  | 'deployments'
+  | 'mergeRequests'
+  | 'commits'
+  | 'jobs'
+  | 'environments'
 
 const FILTER_STORAGE_KEY = 'gitlab_graphql_filters'
 
@@ -115,28 +121,33 @@ function graphQLList(values?: string[]): string | null {
   return `[${encoded}]`
 }
 
-export function buildFilterArguments(filters: AnalyticsFilters, scope: string): string[] {
+export function buildFilterArguments(filters: AnalyticsFilters, scope: FilterScope): string[] {
   const args: string[] = []
 
-  if (filters.period?.from) {
+  const addUpdatedRange =
+    scope === 'pipelines' ||
+    scope === 'deployments' ||
+    scope === 'mergeRequests'
+
+  if (addUpdatedRange && filters.period?.from) {
     args.push(`updatedAfter: "${filters.period.from}"`)
   }
 
-  if (filters.period?.to) {
+  if (addUpdatedRange && filters.period?.to) {
     args.push(`updatedBefore: "${filters.period.to}"`)
   }
 
-  const branches = graphQLList(filters.branch)
-  if (branches) {
-    args.push(`ref: ${branches}`)
-  }
-
-  const users = graphQLList(filters.user)
-  if (users) {
-    args.push(`authorUsername: ${users}`)
-  }
-
   if (scope === 'pipelines') {
+    const branches = graphQLList(filters.branch)
+    if (branches) {
+      args.push(`ref: ${branches}`)
+    }
+
+    const users = graphQLList(filters.user)
+    if (users) {
+      args.push(`authorUsername: ${users}`)
+    }
+
     const statuses = graphQLList(filters.pipelineStatus)
     if (statuses) {
       args.push(`status: ${statuses}`)
