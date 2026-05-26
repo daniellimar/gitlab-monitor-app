@@ -24,6 +24,7 @@ function openPipeline(pipeline: { project_id: number; id: number }) {
 
 const statusFilter = ref<string>('all')
 const projectFilter = ref<string>('all')
+const periodFilter = ref<string>('30')
 const CI_COST_PER_MINUTE_USD = Number(import.meta.env.VITE_CI_COST_PER_MINUTE_USD || '0.008')
 
 const statusOptions = [
@@ -43,6 +44,23 @@ const projectOptions = computed(() => [
   })),
 ])
 
+const periodOptions = [
+  { value: '7', label: 'Últimos 7 dias' },
+  { value: '15', label: 'Últimos 15 dias' },
+  { value: '30', label: 'Últimos 30 dias' },
+  { value: '90', label: 'Últimos 90 dias' },
+  { value: 'all', label: 'Todo período' },
+]
+
+const periodCutoffDate = computed(() => {
+  if (periodFilter.value === 'all') return null
+  const days = Number(periodFilter.value)
+  if (Number.isNaN(days)) return null
+  const cutoff = new Date()
+  cutoff.setDate(cutoff.getDate() - days)
+  return cutoff
+})
+
 const filteredPipelines = computed(() => {
   let pipelines = metricsStore.pipelines
 
@@ -52,6 +70,14 @@ const filteredPipelines = computed(() => {
 
   if (projectFilter.value !== 'all') {
     pipelines = pipelines.filter((p) => String(p.project_id) === projectFilter.value)
+  }
+
+  if (periodCutoffDate.value) {
+    const cutoffTime = periodCutoffDate.value.getTime()
+    pipelines = pipelines.filter((p) => {
+      const createdAt = Date.parse(p.created_at)
+      return !Number.isNaN(createdAt) && createdAt >= cutoffTime
+    })
   }
 
   return pipelines
@@ -249,6 +275,11 @@ function getProjectName(projectId: number) {
             :options="projectOptions"
             class="w-64"
           />
+          <Select
+            v-model="periodFilter"
+            :options="periodOptions"
+            class="w-56"
+          />
         </div>
       </Card>
 
@@ -259,8 +290,9 @@ function getProjectName(projectId: number) {
             v-for="pipeline in enrichedPipelines
               .filter((p) => p.metrics.totalJobs > 0)
               .sort((a, b) => b.metrics.ciMinutes - a.metrics.ciMinutes)
-              .slice(0, 5)"
+              .slice(0, 20)"
             :key="`top-${pipeline.project_id}-${pipeline.id}`"
+            @click="openPipeline(pipeline)"
             class="flex items-center justify-between rounded-lg bg-muted px-3 py-2"
           >
             <div class="min-w-0">

@@ -28,6 +28,7 @@ const statusFilter = ref<string>('all')
 const stageFilter = ref<string>('all')
 const pipelineFilter = ref<string>('all')
 const runnerFilter = ref<string>('all')
+const periodFilter = ref<string>('30')
 const CI_COST_PER_MINUTE_USD = Number(import.meta.env.VITE_CI_COST_PER_MINUTE_USD || '0.008')
 
 const statusOptions = [
@@ -81,6 +82,23 @@ const runnerOptions = computed(() => {
   ]
 })
 
+const periodOptions = [
+  { value: '7', label: 'Últimos 7 dias' },
+  { value: '15', label: 'Últimos 15 dias' },
+  { value: '30', label: 'Últimos 30 dias' },
+  { value: '90', label: 'Últimos 90 dias' },
+  { value: 'all', label: 'Todo período' },
+]
+
+const periodCutoffDate = computed(() => {
+  if (periodFilter.value === 'all') return null
+  const days = Number(periodFilter.value)
+  if (Number.isNaN(days)) return null
+  const cutoff = new Date()
+  cutoff.setDate(cutoff.getDate() - days)
+  return cutoff
+})
+
 const filteredJobs = computed(() => {
   let jobs = metricsStore.jobs
 
@@ -100,6 +118,16 @@ const filteredJobs = computed(() => {
 
   if (runnerFilter.value !== 'all') {
     jobs = jobs.filter((j) => String(j.runner?.id || '') === runnerFilter.value)
+  }
+
+  if (periodCutoffDate.value) {
+    const cutoffTime = periodCutoffDate.value.getTime()
+    jobs = jobs.filter((j) => {
+      const startedAt = j.started_at ? Date.parse(j.started_at) : Number.NaN
+      const createdAt = Date.parse(j.created_at)
+      const baseTime = Number.isNaN(startedAt) ? createdAt : startedAt
+      return !Number.isNaN(baseTime) && baseTime >= cutoffTime
+    })
   }
 
   return jobs
@@ -334,6 +362,11 @@ function formatTime(date: string | null) {
           <Select
             v-model="runnerFilter"
             :options="runnerOptions"
+            class="w-56"
+          />
+          <Select
+            v-model="periodFilter"
+            :options="periodOptions"
             class="w-56"
           />
         </div>
