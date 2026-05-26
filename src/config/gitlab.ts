@@ -26,6 +26,13 @@ export function getGitlabApiBaseUrl(): string {
   return `${getGitlabWebUrl()}/api/v4`
 }
 
+export function getGitlabGraphqlUrl(): string {
+  if (shouldUseApiProxy()) {
+    return '/api/graphql'
+  }
+  return `${getGitlabWebUrl()}/api/graphql`
+}
+
 /** Endpoint para troca do código OAuth (também passa pelo proxy quando ativo). */
 export function getOAuthTokenUrl(): string {
   if (shouldUseApiProxy()) {

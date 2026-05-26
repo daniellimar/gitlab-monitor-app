@@ -217,6 +217,14 @@ class GitLabClient {
     return !!this.token
   }
 
+  getToken() {
+    return this.token
+  }
+
+  getAuthMode() {
+    return this.authMode
+  }
+
   get instance() {
     return this.client
   }

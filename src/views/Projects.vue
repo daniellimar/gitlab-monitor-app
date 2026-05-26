@@ -112,7 +112,7 @@ function formatBytes(bytes: number) {
             <CircleDot class="h-4 w-4" />
             Issues abertas
           </div>
-          <div class="mt-1 text-2xl font-bold text-foreground">{{ stats.openIssues }}</div>
+          <div class="mt-1 text-2xl font-bold text-foreground">{{ stats.openIssues ?? '' }}</div>
         </Card>
       </div>
 

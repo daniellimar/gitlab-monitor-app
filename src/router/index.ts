@@ -97,6 +97,18 @@ const routes = [
     meta: { requiresAuth: true },
   },
   {
+    path: '/dora',
+    name: 'Dora',
+    component: () => import('@/views/Dora.vue'),
+    meta: { requiresAuth: true },
+  },
+  {
+    path: '/graphql',
+    name: 'GraphqlAnalytics',
+    component: () => import('@/views/GraphqlAnalytics.vue'),
+    meta: { requiresAuth: true },
+  },
+  {
     path: '/users',
     name: 'Users',
     component: () => import('@/views/Users.vue'),

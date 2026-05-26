@@ -14,6 +14,8 @@ import {
   ChevronLeft,
   ChevronRight,
   GitMerge,
+  BarChart3,
+  Braces,
 } from 'lucide-vue-next'
 import { useAuthStore } from '@/stores/auth'
 import { useMetricsStore } from '@/stores/metrics'
@@ -42,6 +44,8 @@ const navItems = [
   { path: '/runners', icon: Server, label: 'Runners' },
   { path: '/commits', icon: GitCommit, label: 'Commits' },
   { path: '/merge-requests', icon: GitMerge, label: 'Merge Requests' },
+  { path: '/dora', icon: BarChart3, label: 'DORA Metrics' },
+  { path: '/graphql', icon: Braces, label: 'GraphQL' },
   { path: '/users', icon: Users, label: 'Usuários' },
   { path: '/settings', icon: Settings, label: 'Configurações' },
 ]

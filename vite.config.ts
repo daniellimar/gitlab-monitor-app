@@ -18,6 +18,11 @@ function createGitlabProxy(target: string) {
       secure: true,
       rewrite: (requestPath: string) => requestPath.replace(/^\/oauth\/gitlab/, ''),
     },
+    '/api/graphql': {
+      target,
+      changeOrigin: true,
+      secure: true,
+    },
   }
 }
 
