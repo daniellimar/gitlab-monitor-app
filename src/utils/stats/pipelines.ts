@@ -14,6 +14,14 @@ export function calculatePipelineStats(pipelines: GitLabPipeline[]) {
   const avgDuration =
     withDuration.reduce((acc, p) => acc + (p.duration || 0), 0) / (withDuration.length || 1)
 
+  const totalDuration = withDuration.reduce((acc, p) => acc + (p.duration || 0), 0)
+  const totalQueuedDuration = pipelines.reduce((acc, p) => acc + (p.queued_duration || 0), 0)
+  const withQueuedDuration = pipelines.filter((p) => typeof p.queued_duration === 'number')
+  const avgQueuedDuration =
+    withQueuedDuration.length > 0
+      ? Math.round(totalQueuedDuration / withQueuedDuration.length)
+      : 0
+
   return {
     total,
     success,
@@ -23,5 +31,8 @@ export function calculatePipelineStats(pipelines: GitLabPipeline[]) {
     canceled,
     successRate,
     avgDuration: Math.round(avgDuration),
+    avgQueuedDuration,
+    totalDuration: Math.round(totalDuration),
+    totalQueuedDuration: Math.round(totalQueuedDuration),
   }
 }

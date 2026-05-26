@@ -79,7 +79,10 @@ function roleBadgeVariant(level: number): 'default' | 'success' | 'secondary' | 
 }
 
 function formatJoined(date: string) {
-  return format(parseISO(date), "dd MMM yyyy", { locale: ptBR })
+  if (!date) return '-'
+  const parsed = parseISO(date)
+  if (Number.isNaN(parsed.getTime())) return '-'
+  return format(parsed, "dd MMM yyyy", { locale: ptBR })
 }
 </script>
 

@@ -26,6 +26,10 @@ export function calculateJobStats(jobs: GitLabJob[]) {
     avgDuration: Math.round(data.totalDuration / data.count),
   }))
 
+  const withDuration = jobs.filter((j) => typeof j.duration === 'number')
+  const totalDuration = withDuration.reduce((acc, job) => acc + (job.duration || 0), 0)
+  const avgDuration = withDuration.length > 0 ? Math.round(totalDuration / withDuration.length) : 0
+
   return {
     total,
     success,
@@ -34,5 +38,7 @@ export function calculateJobStats(jobs: GitLabJob[]) {
     pending,
     stages,
     successRate: total > 0 ? Math.round((success / total) * 100) : 0,
+    avgDuration,
+    totalDuration: Math.round(totalDuration),
   }
 }

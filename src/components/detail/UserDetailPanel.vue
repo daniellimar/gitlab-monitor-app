@@ -1,16 +1,18 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { format, parseISO } from 'date-fns'
+import { format, parseISO, subDays } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
-import { Users, ExternalLink, GitCommit, Loader2, Mail } from 'lucide-vue-next'
-import { getUserFull } from '@/api/endpoints/users'
+import { Users, ExternalLink, GitCommit, Loader2 } from 'lucide-vue-next'
+import {
+  getUserFull,
+} from '@/api/endpoints/users'
 import { getGroupMember } from '@/api/endpoints/members'
+import { getAllUserCommitsAcrossProjects } from '@/api/endpoints/commits'
 import { useMetricsStore } from '@/stores/metrics'
 import { useDetailClose } from '@/composables/useDetailClose'
 import { getAccessLevelLabel } from '@/utils/gitlabAccess'
 import { mergeApiRecords } from '@/utils/apiDataDisplay'
-import ApiDataExplorer from './ApiDataExplorer.vue'
 import Badge from '@/components/ui/Badge.vue'
 import Card from '@/components/ui/Card.vue'
 
@@ -19,13 +21,20 @@ const router = useRouter()
 const metricsStore = useMetricsStore()
 useDetailClose()
 
+const loadingLock = ref(false)
+
 const userId = computed(() => Number(route.params.userId))
+const CI_COST_PER_MINUTE_USD = Number(import.meta.env.VITE_CI_COST_PER_MINUTE_USD || '0.008')
 
 const member = computed(() =>
   metricsStore.members.find((m) => m.id === userId.value) ?? null
 )
 
 const apiPayload = ref<Record<string, unknown>>({})
+const userCommits365 = ref(metricsStore.commits)
+const userIssues = ref<Record<string, unknown>[]>([])
+const userMergeRequests = ref<Record<string, unknown>[]>([])
+const userEvents = ref<Record<string, unknown>[]>([])
 const isLoading = ref(false)
 
 const displayName = computed(() => {
@@ -34,34 +43,219 @@ const displayName = computed(() => {
 })
 
 const authorCommits = computed(() => {
-  const name = displayName.value
-  return metricsStore.commits.filter((c) => c.author_name === name).slice(0, 12)
+  const name = displayName.value.trim().toLowerCase()
+  const username = String(apiPayload.value.username ?? member.value?.username ?? '').trim().toLowerCase()
+
+  return userCommits365.value
+    .filter((c) => {
+      const commitName = c.author_name.trim().toLowerCase()
+      const commitEmail = c.author_email.trim().toLowerCase()
+      return commitName === name || (username && commitEmail.includes(username))
+    })
+    .sort((a, b) => new Date(b.committed_date).getTime() - new Date(a.committed_date).getTime())
+})
+
+const userJobs = computed(() => {
+  const id = userId.value
+  if (!id || Number.isNaN(id)) return []
+  return metricsStore.jobs.filter((job) => job.user?.id === id)
+})
+
+const userProjects = computed(() => {
+  const map = new Map<number, { id: number; name: string; web_url: string; jobs: number; ciMinutes: number; cost: number; commits: number }>()
+
+  for (const project of metricsStore.projects) {
+    map.set(project.id, {
+      id: project.id,
+      name: project.name,
+      web_url: project.web_url,
+      jobs: 0,
+      ciMinutes: 0,
+      cost: 0,
+      commits: 0,
+    })
+  }
+
+  for (const job of userJobs.value) {
+    const projectId = job.pipeline?.project_id
+    if (!projectId) continue
+    if (!map.has(projectId)) {
+      const project = metricsStore.projects.find((p) => p.id === projectId)
+      map.set(projectId, {
+        id: projectId,
+        name: project?.name || `Projeto ${projectId}`,
+        web_url: project?.web_url || '',
+        jobs: 0,
+        ciMinutes: 0,
+        cost: 0,
+        commits: 0,
+      })
+    }
+
+    const item = map.get(projectId)
+    if (!item) continue
+    const totalSeconds = (job.duration || 0) + (job.queued_duration || 0)
+    const ciMinutes = Math.round(totalSeconds / 60)
+    item.jobs += 1
+    item.ciMinutes += ciMinutes
+    item.cost += ciMinutes * CI_COST_PER_MINUTE_USD
+  }
+
+  for (const commit of userCommits365.value) {
+    const projectId = commit.project_id
+    if (!projectId) continue
+    if (!map.has(projectId)) {
+      const project = metricsStore.projects.find((p) => p.id === projectId)
+      map.set(projectId, {
+        id: projectId,
+        name: project?.name || `Projeto ${projectId}`,
+        web_url: project?.web_url || '',
+        jobs: 0,
+        ciMinutes: 0,
+        cost: 0,
+        commits: 0,
+      })
+    }
+
+    const item = map.get(projectId)
+    if (item) item.commits += 1
+  }
+
+  return Array.from(map.values())
+    .filter((item) => item.jobs > 0 || item.commits > 0)
+    .map((item) => ({ ...item, cost: Number(item.cost.toFixed(2)) }))
+    .sort((a, b) => (b.commits + b.jobs) - (a.commits + a.jobs))
+})
+
+const userStats = computed(() => {
+  const jobs = userJobs.value
+  const totalJobs = jobs.length
+  const totalRunSeconds = jobs.reduce((acc, j) => acc + (j.duration || 0), 0)
+  const totalQueueSeconds = jobs.reduce((acc, j) => acc + (j.queued_duration || 0), 0)
+  const totalCiSeconds = totalRunSeconds + totalQueueSeconds
+  const totalCiMinutes = Math.round(totalCiSeconds / 60)
+  const estimatedCost = Number((totalCiMinutes * CI_COST_PER_MINUTE_USD).toFixed(2))
+
+  const successJobs = jobs.filter((j) => j.status === 'success').length
+  const failedJobs = jobs.filter((j) => j.status === 'failed').length
+  const runningJobs = jobs.filter((j) => j.status === 'running').length
+  const successRate = totalJobs > 0 ? Math.round((successJobs / totalJobs) * 100) : 0
+
+  const commits = userCommits365.value
+  const totalCommits = commits.length
+  const commitStats = commits.reduce(
+    (acc, commit) => {
+      acc.additions += commit.stats?.additions || 0
+      acc.deletions += commit.stats?.deletions || 0
+      acc.totalChanges += commit.stats?.total || 0
+      return acc
+    },
+    { additions: 0, deletions: 0, totalChanges: 0 }
+  )
+
+  const issues = userIssues.value
+  const openedIssues = issues.filter((issue) => String(issue.state || '') === 'opened').length
+  const closedIssues = issues.filter((issue) => String(issue.state || '') === 'closed').length
+
+  const mergeRequests = userMergeRequests.value
+  const openedMrs = mergeRequests.filter((mr) => String(mr.state || '') === 'opened').length
+  const mergedMrs = mergeRequests.filter((mr) => String(mr.state || '') === 'merged').length
+  const closedMrs = mergeRequests.filter((mr) => String(mr.state || '') === 'closed').length
+
+  const wikiEvents = userEvents.value.filter((event) => String(event.target_type || '').toLowerCase() === 'wiki_page').length
+
+  return {
+    totalJobs,
+    successJobs,
+    failedJobs,
+    runningJobs,
+    successRate,
+    totalRunSeconds,
+    totalQueueSeconds,
+    totalCiSeconds,
+    totalCiMinutes,
+    estimatedCost,
+    projectsCount: userProjects.value.length,
+    totalCommits,
+    additions: commitStats.additions,
+    deletions: commitStats.deletions,
+    totalChanges: commitStats.totalChanges,
+    issuesTotal: issues.length,
+    openedIssues,
+    closedIssues,
+    mergeRequestsTotal: mergeRequests.length,
+    openedMrs,
+    mergedMrs,
+    closedMrs,
+    wikiEvents,
+  }
 })
 
 async function load() {
+  if (loadingLock.value) return
   if (!userId.value || Number.isNaN(userId.value)) return
 
+  loadingLock.value = true
   isLoading.value = true
+
   try {
+    const since365 = subDays(new Date(), 365).toISOString()
+
     const [userFull, groupMember] = await Promise.all([
       getUserFull(userId.value).catch(() => ({})),
       metricsStore.groupId
-        ? getGroupMember(metricsStore.groupId, userId.value).catch(() => null)
-        : Promise.resolve(null),
+          ? getGroupMember(metricsStore.groupId, userId.value).catch(() => null)
+          : Promise.resolve(null),
     ])
 
     apiPayload.value = mergeApiRecords(
-      member.value as Record<string, unknown> | undefined,
-      userFull,
-      groupMember ? { group_membership: groupMember } : undefined
+        member.value,
+        userFull,
+        groupMember ? { group_membership: groupMember } : undefined
     )
+
+    const email = String((userFull as any).email || '')
+
+    const commits365 = email
+        ? await getAllUserCommitsAcrossProjects(metricsStore.projects, {
+          perPage: 100,
+          since: since365,
+          authorEmail: email,
+        })
+        : []
+
+    userCommits365.value = commits365
+
   } finally {
     isLoading.value = false
+    loadingLock.value = false
   }
 }
 
 function formatJoined(date: string) {
-  return format(parseISO(date), "dd MMM yyyy", { locale: ptBR })
+  if (!date) return '-'
+  const parsed = parseISO(date)
+  if (Number.isNaN(parsed.getTime())) return '-'
+  return format(parsed, "dd MMM yyyy", { locale: ptBR })
+}
+
+function formatDuration(seconds: number) {
+  if (!seconds) return '0s'
+  if (seconds < 60) return `${seconds}s`
+  const minutes = Math.floor(seconds / 60)
+  const remainingSeconds = seconds % 60
+  if (minutes < 60) return `${minutes}m ${remainingSeconds}s`
+  const hours = Math.floor(minutes / 60)
+  const remainingMinutes = minutes % 60
+  return `${hours}h ${remainingMinutes}m`
+}
+
+function formatCurrency(value: number) {
+  return new Intl.NumberFormat('pt-BR', {
+    style: 'currency',
+    currency: 'USD',
+    minimumFractionDigits: 2,
+  }).format(value)
 }
 
 function openCommit(commit: { project_id?: number; id: string }) {
@@ -73,7 +267,13 @@ function openCommit(commit: { project_id?: number; id: string }) {
 }
 
 onMounted(load)
-watch(userId, load)
+watch(
+    () => route.params.userId,
+    async () => {
+      await load()
+    },
+    { immediate: true }
+)
 </script>
 
 <template>
@@ -137,20 +337,94 @@ watch(userId, load)
       </div>
     </div>
 
+    <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <Card class="p-4">
+        <div class="text-sm text-muted-foreground">Commits (365d)</div>
+        <div class="mt-1 text-2xl font-bold text-foreground">{{ userStats.totalCommits }}</div>
+        <p class="mt-1 text-xs text-muted-foreground">Add: {{ userStats.additions }} | Del: {{ userStats.deletions }}</p>
+      </Card>
+      <Card class="p-4">
+        <div class="text-sm text-muted-foreground">Projetos em atuação</div>
+        <div class="mt-1 text-2xl font-bold text-foreground">{{ userStats.projectsCount }}</div>
+      </Card>
+      <Card class="p-4">
+        <div class="text-sm text-muted-foreground">Tempo total de CI</div>
+        <div class="mt-1 text-2xl font-bold text-foreground">{{ formatDuration(userStats.totalCiSeconds) }}</div>
+        <p class="mt-1 text-xs text-muted-foreground">Run: {{ formatDuration(userStats.totalRunSeconds) }} | Fila: {{ formatDuration(userStats.totalQueueSeconds) }}</p>
+      </Card>
+      <Card class="p-4">
+        <div class="text-sm text-muted-foreground">Custo estimado</div>
+        <div class="mt-1 text-2xl font-bold text-foreground">{{ formatCurrency(userStats.estimatedCost) }}</div>
+        <p class="mt-1 text-xs text-muted-foreground">{{ userStats.totalCiMinutes }} min de CI</p>
+      </Card>
+    </div>
+
+    <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <Card class="p-4">
+        <div class="text-sm text-muted-foreground">Merge Requests</div>
+        <div class="mt-1 text-2xl font-bold text-foreground">{{ userStats.mergeRequestsTotal }}</div>
+        <p class="mt-1 text-xs text-muted-foreground">Open {{ userStats.openedMrs }} | Merged {{ userStats.mergedMrs }} | Closed {{ userStats.closedMrs }}</p>
+      </Card>
+      <Card class="p-4">
+        <div class="text-sm text-muted-foreground">Issues</div>
+        <div class="mt-1 text-2xl font-bold text-foreground">{{ userStats.issuesTotal }}</div>
+        <p class="mt-1 text-xs text-muted-foreground">Open {{ userStats.openedIssues }} | Closed {{ userStats.closedIssues }}</p>
+      </Card>
+      <Card class="p-4">
+        <div class="text-sm text-muted-foreground">Wiki events</div>
+        <div class="mt-1 text-2xl font-bold text-foreground">{{ userStats.wikiEvents }}</div>
+      </Card>
+      <Card class="p-4">
+        <div class="text-sm text-muted-foreground">Mudanças de código</div>
+        <div class="mt-1 text-2xl font-bold text-foreground">{{ userStats.totalChanges }}</div>
+      </Card>
+    </div>
+
     <Card class="p-4">
-      <div class="text-sm text-muted-foreground">Commits no período</div>
-      <div class="mt-1 text-2xl font-bold text-foreground">{{ authorCommits.length }}</div>
-      <p class="mt-1 text-xs text-muted-foreground">
-        Últimos {{ metricsStore.commitPeriodDays }} dias
-      </p>
+      <h3 class="mb-3 text-sm font-medium text-foreground">Resumo de jobs</h3>
+      <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-4 text-sm">
+        <div class="rounded-lg bg-muted p-3">
+          <div class="text-muted-foreground">Total</div>
+          <div class="mt-1 text-lg font-semibold text-foreground">{{ userStats.totalJobs }}</div>
+        </div>
+        <div class="rounded-lg bg-muted p-3">
+          <div class="text-muted-foreground">Sucesso</div>
+          <div class="mt-1 text-lg font-semibold text-success">{{ userStats.successJobs }} ({{ userStats.successRate }}%)</div>
+        </div>
+        <div class="rounded-lg bg-muted p-3">
+          <div class="text-muted-foreground">Falhas</div>
+          <div class="mt-1 text-lg font-semibold text-destructive">{{ userStats.failedJobs }}</div>
+        </div>
+        <div class="rounded-lg bg-muted p-3">
+          <div class="text-muted-foreground">Em execução</div>
+          <div class="mt-1 text-lg font-semibold text-primary">{{ userStats.runningJobs }}</div>
+        </div>
+      </div>
+    </Card>
+
+    <Card class="p-4">
+      <h3 class="mb-3 text-sm font-medium text-foreground">Projetos em que atua</h3>
+      <div v-if="userProjects.length" class="space-y-2">
+        <div v-for="project in userProjects" :key="project.id" class="flex items-center justify-between rounded-lg border border-border px-3 py-2">
+          <div class="min-w-0">
+            <p class="truncate text-sm font-medium text-foreground">{{ project.name }}</p>
+            <p class="text-xs text-muted-foreground">{{ project.commits }} commits · {{ project.jobs }} jobs · {{ project.ciMinutes }} min</p>
+          </div>
+          <div class="text-right">
+            <p class="text-sm text-foreground">{{ formatCurrency(project.cost) }}</p>
+            <a v-if="project.web_url" :href="project.web_url" target="_blank" rel="noopener noreferrer" class="text-xs text-muted-foreground hover:text-foreground">Abrir projeto</a>
+          </div>
+        </div>
+      </div>
+      <p v-else class="text-sm text-muted-foreground">Sem atividades do usuário no período atual.</p>
     </Card>
 
     <section v-if="authorCommits.length">
       <h3 class="mb-2 flex items-center gap-2 text-sm font-medium text-foreground">
         <GitCommit class="h-4 w-4" />
-        Commits recentes
+        Histórico de commits
       </h3>
-      <div class="space-y-2">
+      <div class="max-h-96 space-y-2 overflow-auto pr-1">
         <button
           v-for="commit in authorCommits"
           :key="commit.id"
@@ -167,12 +441,56 @@ watch(userId, load)
         </button>
       </div>
     </section>
+    <Card class="p-4">
+      <h3 class="mb-3 text-sm font-medium text-foreground">Merge Requests</h3>
+      <div v-if="userMergeRequests.length" class="max-h-72 space-y-2 overflow-auto pr-1">
+        <a
+          v-for="mr in userMergeRequests.slice(0, 50)"
+          :key="String(mr.id)"
+          :href="String(mr.web_url || '#')"
+          target="_blank"
+          rel="noopener noreferrer"
+          class="block rounded-lg border border-border px-3 py-2 hover:bg-muted/40"
+        >
+          <p class="truncate text-sm font-medium text-foreground">{{ String(mr.title || 'Merge Request') }}</p>
+          <p class="text-xs text-muted-foreground">{{ String(mr.state || '') }} · {{ String(mr.target_branch || '') }}</p>
+        </a>
+      </div>
+      <p v-else class="text-sm text-muted-foreground">Sem merge requests para este usuário.</p>
+    </Card>
 
-    <p v-else class="flex items-center gap-2 text-sm text-muted-foreground">
-      <Mail class="h-4 w-4" />
-      Nenhum commit deste autor no período carregado.
-    </p>
+    <Card class="p-4">
+      <h3 class="mb-3 text-sm font-medium text-foreground">Issues</h3>
+      <div v-if="userIssues.length" class="max-h-72 space-y-2 overflow-auto pr-1">
+        <a
+          v-for="issue in userIssues.slice(0, 50)"
+          :key="String(issue.id)"
+          :href="String(issue.web_url || '#')"
+          target="_blank"
+          rel="noopener noreferrer"
+          class="block rounded-lg border border-border px-3 py-2 hover:bg-muted/40"
+        >
+          <p class="truncate text-sm font-medium text-foreground">{{ String(issue.title || 'Issue') }}</p>
+          <p class="text-xs text-muted-foreground">{{ String(issue.state || '') }} · </p>
+        </a>
+      </div>
+      <p v-else class="text-sm text-muted-foreground">Sem issues para este usuário.</p>
+    </Card>
 
-    <ApiDataExplorer :data="apiPayload" />
+    <Card class="p-4">
+      <h3 class="mb-3 text-sm font-medium text-foreground">Histórico de wiki e eventos</h3>
+      <div v-if="userEvents.length" class="max-h-72 space-y-2 overflow-auto pr-1">
+        <div
+          v-for="event in userEvents.slice(0, 80)"
+          :key="String(event.id)"
+          class="rounded-lg border border-border px-3 py-2"
+        >
+          <p class="text-sm font-medium text-foreground">{{ String(event.action_name || 'evento') }}</p>
+          <p class="text-xs text-muted-foreground">{{ String(event.target_type || '-') }} · {{ String(event.created_at || '-') }}</p>
+        </div>
+      </div>
+      <p v-else class="text-sm text-muted-foreground">Sem eventos para este usuário.</p>
+    </Card>
+
   </div>
 </template>

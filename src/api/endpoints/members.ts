@@ -3,7 +3,6 @@ import { parseTotalHeader } from '../utils'
 import type { GitLabGroupMember } from '@/types/gitlab'
 
 export async function getGroupMembers(
-  groupId: string | number,
   options: {
     page?: number
     perPage?: number
@@ -12,8 +11,8 @@ export async function getGroupMembers(
 ): Promise<{ data: GitLabGroupMember[]; total: number }> {
   const { page = 1, perPage = 100, query } = options
 
-  const response = await gitlabClient.instance.get<GitLabGroupMember[]>(
-    `/groups/${groupId}/members`,
+  const response = await gitlabClient.instance.get<Partial<GitLabGroupMember>[]>(
+    `/users`,
     {
       params: {
         page,
@@ -23,7 +22,19 @@ export async function getGroupMembers(
     }
   )
 
-  return { data: response.data, total: parseTotalHeader(response.headers) }
+  const data = response.data.map((user) => ({
+    id: user.id || 0,
+    username: user.username || '',
+    name: user.name || user.username || `User ${user.id || ''}`,
+    state: user.state || 'active',
+    avatar_url: user.avatar_url || '',
+    web_url: user.web_url || '',
+    access_level: user.access_level || 10,
+    created_at: user.created_at || '',
+    expires_at: user.expires_at || null,
+  }))
+
+  return { data, total: parseTotalHeader(response.headers) }
 }
 
 export async function getGroupMember(
@@ -37,15 +48,14 @@ export async function getGroupMember(
 }
 
 export async function getAllGroupMembers(
-  groupId: string | number
 ): Promise<GitLabGroupMember[]> {
-  const first = await getGroupMembers(groupId, { perPage: 100, page: 1 })
+  const first = await getGroupMembers({ perPage: 100, page: 1 })
   if (first.total <= first.data.length) return first.data
 
   const pages = Math.ceil(first.total / 100)
   const rest = await Promise.all(
     Array.from({ length: pages - 1 }, (_, i) =>
-      getGroupMembers(groupId, { perPage: 100, page: i + 2 }).then((r) => r.data)
+      getGroupMembers({ perPage: 100, page: i + 2 }).then((r) => r.data)
     )
   )
 

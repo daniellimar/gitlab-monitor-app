@@ -200,6 +200,11 @@ export interface DashboardMetrics {
   runnersOffline: number
   totalCommitsToday: number
   totalProjects: number
+  avgPipelineDurationSec: number
+  avgPipelineQueueDurationSec: number
+  avgJobDurationSec: number
+  totalCiMinutes: number
+  estimatedCiCost: number
 }
 
 export interface PipelineChartData {
