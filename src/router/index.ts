@@ -16,6 +16,16 @@ const routes = [
   },
   {
     path: '/',
+    redirect: '/home',
+  },
+  {
+    path: '/home',
+    name: 'Home',
+    component: () => import('@/views/Home.vue'),
+    meta: { requiresAuth: true },
+  },
+  {
+    path: '/dashboard',
     name: 'Dashboard',
     component: () => import('@/views/Dashboard.vue'),
     meta: { requiresAuth: true },
@@ -150,7 +160,7 @@ router.beforeEach((to, _from, next) => {
   if (requiresAuth && !authStore.isAuthenticated) {
     next({ name: 'Login' })
   } else if (to.name === 'Login' && authStore.isAuthenticated) {
-    next({ name: 'Dashboard' })
+    next({ name: 'Home' })
   } else {
     next()
   }

@@ -33,7 +33,7 @@ onMounted(async () => {
   if (success) {
     status.value = 'success'
     setTimeout(() => {
-      router.push('/')
+      router.push('/home')
     }, 1500)
   } else {
     status.value = 'error'

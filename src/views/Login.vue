@@ -16,7 +16,7 @@ const isPatMode = ref(true)
 async function handlePatLogin() {
   if (!patToken.value.trim()) return
   authStore.setPatToken(patToken.value.trim())
-  router.push('/')
+  router.push('/home')
 }
 
 async function handleOAuthLogin() {

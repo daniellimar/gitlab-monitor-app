@@ -2,6 +2,7 @@
 import { computed } from 'vue'
 import { useRoute, RouterLink } from 'vue-router'
 import {
+  Home,
   LayoutDashboard,
   GitBranch,
   Play,
@@ -37,7 +38,8 @@ const authStore = useAuthStore()
 const metricsStore = useMetricsStore()
 
 const navItems = [
-  { path: '/', icon: LayoutDashboard, label: 'Dashboard' },
+  { path: '/home', icon: Home, label: 'Home' },
+  { path: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
   { path: '/projects', icon: FolderGit2, label: 'Projetos' },
   { path: '/pipelines', icon: GitBranch, label: 'Pipelines' },
   { path: '/jobs', icon: Play, label: 'Jobs' },
@@ -50,10 +52,7 @@ const navItems = [
   { path: '/settings', icon: Settings, label: 'Configurações' },
 ]
 
-const isActive = (path: string) => {
-  if (path === '/') return route.path === '/'
-  return route.path.startsWith(path)
-}
+const isActive = (path: string) => route.path.startsWith(path)
 
 const toggleCollapse = () => {
   emit('update:collapsed', !props.collapsed)

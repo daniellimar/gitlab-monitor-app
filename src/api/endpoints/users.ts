@@ -217,3 +217,41 @@ export async function getUserGraphqlSummary(
     topGroups,
   }
 }
+
+export async function searchUsersByUsername(username: string): Promise<GitLabUser[]> {
+  const value = username.trim()
+  if (!value) return []
+
+  const response = await gitlabClient.instance.get<GitLabUser[]>('/users', {
+    params: {
+      username: value,
+      per_page: 20,
+    },
+  })
+
+  return response.data
+}
+
+export async function getUserProjects(userId: string | number): Promise<Record<string, unknown>[]> {
+  const response = await gitlabClient.instance.get<Record<string, unknown>[]>(`/users/${userId}/projects`, {
+    params: {
+      per_page: 100,
+      order_by: 'last_activity_at',
+      sort: 'desc',
+      simple: false,
+      statistics: true,
+    },
+  })
+
+  return response.data
+}
+
+export async function getUserRecentEvents(userId: string | number): Promise<Record<string, unknown>[]> {
+  const response = await gitlabClient.instance.get<Record<string, unknown>[]>(`/users/${userId}/events`, {
+    params: {
+      per_page: 30,
+    },
+  })
+
+  return response.data
+}
